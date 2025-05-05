@@ -3,6 +3,10 @@ import React, { useState } from 'react';
 import { View, TextInput, Button, Text, StyleSheet } from 'react-native';
 import axios from 'axios';
 
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+
 const API_URL = 'http://localhost:8000/api/admin/login'; // Usa tu IP local si estás en desarrollo
 
 const LoginScreen = () => {
@@ -10,6 +14,7 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
   const [token, setToken] = useState('');
+  const router = useRouter();
 
   const handleLogin = async () => {
     try {
@@ -23,6 +28,9 @@ const LoginScreen = () => {
       setToken(accessToken);
       setError('');
       console.log('Login exitoso', accessToken);
+
+      await AsyncStorage.setItem('token', accessToken);
+      router.replace('/(tabs)'); // Redirige al index de (tabs)
     } catch (err: any) {
       console.error(err);
       setError('Credenciales inválidas o error de conexión');
