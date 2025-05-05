@@ -53,10 +53,27 @@ const LoginScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 20, marginTop: 100 },
-  input: { borderBottomWidth: 1, marginBottom: 15, fontSize: 16 },
-  error: { color: 'red', marginTop: 10 },
-  token: { marginTop: 10, color: 'green' },
+  container: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: '#FFFFFF', // Fondo blanco
+    padding: 20 
+  },
+  input: { 
+    borderBottomWidth: 1, 
+    marginBottom: 15, 
+    fontSize: 16, 
+    color: '#000000', // Texto negro
+  },
+  error: { 
+    color: 'red', 
+    marginTop: 10 
+  },
+  token: { 
+    marginTop: 10, 
+    color: 'green' 
+  },
 });
 
 export default LoginScreen;
