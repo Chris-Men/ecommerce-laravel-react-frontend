@@ -23,13 +23,17 @@ const LoginScreen = () => {
         password
       });
 
-      // Aquí guardas el token JWT
+      console.log('Respuesta de la API:', response.data); // Verificar la respuesta
+
+      // Aquí guardas el token JWT y el nombre del usuario
       const accessToken = response.data.access_token;
+      const userName = response.data.name; // Asegúrate de que tu API devuelva el nombre
       setToken(accessToken);
       setError('');
       console.log('Login exitoso', accessToken);
 
       await AsyncStorage.setItem('token', accessToken);
+      await AsyncStorage.setItem('userName', userName); // Guardar el nombre del usuario
       router.replace('/(tabs)'); // Redirige al index de (tabs)
     } catch (err: any) {
       console.error(err);
@@ -61,26 +65,26 @@ const LoginScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF', // Fondo blanco
-    padding: 20 
+    padding: 20
   },
-  input: { 
-    borderBottomWidth: 1, 
-    marginBottom: 15, 
-    fontSize: 16, 
+  input: {
+    borderBottomWidth: 1,
+    marginBottom: 15,
+    fontSize: 16,
     color: '#000000', // Texto negro
   },
-  error: { 
-    color: 'red', 
-    marginTop: 10 
+  error: {
+    color: 'red',
+    marginTop: 10
   },
-  token: { 
-    marginTop: 10, 
-    color: 'green' 
+  token: {
+    marginTop: 10,
+    color: 'green'
   },
 });
 
