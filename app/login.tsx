@@ -31,12 +31,19 @@ const LoginScreen = () => {
       setToken(accessToken);
       setError('');
       console.log('Login exitoso', accessToken);
+      console.log('Nombre de usuario:', userName);
 
-      await AsyncStorage.setItem('token', accessToken);
-      await AsyncStorage.setItem('userName', userName); // Guardar el nombre del usuario
-      router.replace('/(tabs)'); // Redirige al index de (tabs)
+      if (accessToken) {
+        await AsyncStorage.setItem('token', accessToken);
+        await AsyncStorage.setItem('userName', userName);
+        console.log('Token y nombre guardados en AsyncStorage');
+        router.replace('/(tabs)'); // Redirige al index de (tabs)
+      } else {
+        console.error('No se pudo obtener el token');
+        setError('Error al obtener el token');
+      }
     } catch (err: any) {
-      console.error(err);
+      console.error('Error en el inicio de sesión:', err);
       setError('Credenciales inválidas o error de conexión');
     }
   };
