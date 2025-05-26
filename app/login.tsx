@@ -10,8 +10,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const API_URL = 'http://localhost:8000/api/admin/login'; // Usa tu IP local si estás en desarrollo
 
 const LoginScreen = () => {
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('superadmin@example.com');
+  const [password, setPassword] = useState('password123');
   const [error, setError] = useState('');
   const [token, setToken] = useState('');
   const router = useRouter();
