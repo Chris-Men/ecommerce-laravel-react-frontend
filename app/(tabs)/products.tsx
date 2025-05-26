@@ -1,23 +1,24 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Button,
   FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-  Button,
-  Modal,
-  Alert,
-  ScrollView,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Product = {
+  thumbnail: any;
   id: number;
   name: string;
   description: string;
@@ -36,7 +37,6 @@ export default function AdminProductsScreen() {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Form fields
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -105,7 +105,6 @@ export default function AdminProductsScreen() {
       setModalVisible(false);
       fetchProducts();
 
-      // Limpiar campos
       setName('');
       setDescription('');
       setPrice('');
@@ -139,17 +138,23 @@ export default function AdminProductsScreen() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <Text style={styles.name}>{item.name}</Text>
-           {item.image_url ? (
-  <Image
-    source={{ uri: `http://localhost:8000/storage/${item.image_url}` }}
-    style={styles.productImage}
-    onError={(error) => {
-      console.log('Error al cargar imagen:', error.nativeEvent);
-    }}
-  />
-) : (
-  <Text style={{ color: 'gray' }}>Sin imagen disponible</Text>
-)}
+
+            {item.thumbnail ? (
+              <Image
+                source={{
+                  uri: item.thumbnail.startsWith('http')
+                    ? item.thumbnail
+                    : `http://localhost:8000/storage/${item.thumbnail}`,
+                }}
+                style={styles.productImage}
+                onError={(error) => {
+                  console.log('Error al cargar imagen:', error.nativeEvent);
+                  console.log('thumbnail:', item.thumbnail);
+                }}
+              />
+            ) : (
+              <Text style={{ color: 'gray' }}>Sin imagen disponible</Text>
+            )}
 
             <Text>Descripción: {item.description}</Text>
             <Text>Precio: ${item.price}</Text>
