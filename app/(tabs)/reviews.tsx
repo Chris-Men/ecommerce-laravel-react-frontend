@@ -7,21 +7,24 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 
 const API_URL = 'http://localhost:8000/api/admin/reviews';
 
 type Review = {
   id: number;
-  user_id: number;
-  product_id: number;
+  user: { id: number; name: string };
+  product: { id: number; name: string };
   rating: number;
   comment?: string;
   title?: string;
 };
 
 export default function ReviewsPage() {
+  const navigation = useNavigation();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -51,7 +54,13 @@ export default function ReviewsPage() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Botón Volver */}
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Text style={styles.backButtonText}>← Volver</Text>
+      </TouchableOpacity>
+
       <Text style={styles.title}>Reseñas</Text>
+
       {loading ? (
         <ActivityIndicator size="large" />
       ) : (
@@ -61,8 +70,8 @@ export default function ReviewsPage() {
           renderItem={({ item }) => (
             <View style={styles.card}>
               <Text style={styles.bold}>Título: {item.title || 'Sin título'}</Text>
-              <Text>Usuario ID: {item.user_id}</Text>
-              <Text>Producto ID: {item.product_id}</Text>
+              <Text>Usuario: {item.user?.name || 'Desconocido'}</Text>
+              <Text>Producto: {item.product?.name || 'Desconocido'}</Text>
               <Text>Calificación: {item.rating} ⭐</Text>
               <Text>Comentario: {item.comment || 'Sin comentario'}</Text>
             </View>
@@ -77,6 +86,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+  },
+  backButton: {
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
   },
   title: {
     fontSize: 22,

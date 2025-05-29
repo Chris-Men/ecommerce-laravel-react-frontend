@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native'; // <-- Importación para navegación
 
 const API_URL = 'http://localhost:8000/api/admin/sizes';
 
@@ -22,6 +23,8 @@ type Size = {
 };
 
 export default function SizesPage() {
+  const navigation = useNavigation(); // <-- Hook de navegación
+
   const [sizes, setSizes] = useState<Size[]>([]);
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -135,6 +138,11 @@ export default function SizesPage() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Botón Volver */}
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Text style={styles.backButtonText}>← Volver</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => {
@@ -225,7 +233,9 @@ export default function SizesPage() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>¿Eliminar talla?</Text>
-            <Text style={{ marginBottom: 20 }}>¿Estás seguro de que deseas eliminar esta talla?</Text>
+            <Text style={{ marginBottom: 20 }}>
+              ¿Estás seguro de que deseas eliminar esta talla?
+            </Text>
             <View style={styles.modalButtons}>
               <Button title="Eliminar" onPress={handleDelete} color="red" />
               <Button
@@ -247,6 +257,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+  },
+  backButton: {
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
   },
   addButton: {
     backgroundColor: '#28a745',

@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native'; // ← Importación añadida
 
 const API_URL = 'http://localhost:8000/api/admin/colors';
 
@@ -22,6 +23,8 @@ type Color = {
 };
 
 export default function ColorsPage() {
+  const navigation = useNavigation(); // ← Hook de navegación
+
   const [colors, setColors] = useState<Color[]>([]);
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -138,6 +141,12 @@ export default function ColorsPage() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Botón Volver */}
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Text style={styles.backButtonText}>← Volver</Text>
+      </TouchableOpacity>
+
+      {/* Botón Agregar */}
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => {
@@ -252,6 +261,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+  },
+  backButton: {
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
   },
   addButton: {
     backgroundColor: '#28a745',

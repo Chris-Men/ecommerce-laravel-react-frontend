@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 
 const API_URL = 'http://localhost:8000/api/admin/orders';
 
@@ -23,6 +24,7 @@ type Order = {
 };
 
 export default function OrdersPage() {
+  const navigation = useNavigation();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -69,54 +71,17 @@ export default function OrdersPage() {
     }
   };
 
-  const deleteOrder = async (id: number) => {
-    Alert.alert('Confirmar', '¿Eliminar este pedido?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const token = await AsyncStorage.getItem('token');
-            const res = await fetch(`${API_URL}/${id}`, {
-              method: 'DELETE',
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: 'application/json',
-              },
-            });
-            const data = await res.json();
-            if (res.ok) {
-              Alert.alert('Eliminado', data.message);
-              fetchOrders();
-            } else {
-              Alert.alert('Error', data.message);
-            }
-          } catch (error: any) {
-            console.error('Error al eliminar pedido:', error.message);
-          }
-        },
-      },
-    ]);
-  };
-
   useEffect(() => {
     fetchOrders();
   }, []);
 
-  const formatDate = (date: string | null | undefined) => {
-    if (!date) return 'Sin fecha';
-    const parsed = new Date(date);
-    if (isNaN(parsed.getTime())) return 'Fecha inválida';
-
-    return new Intl.DateTimeFormat('es-SV', {
-      day: 'numeric',
-      month: 'long',
-    }).format(parsed);
-  };
-
   return (
     <SafeAreaView style={styles.container}>
+      {/* Botón de regresar */}
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Text style={styles.backButtonText}>← Volver</Text>
+      </TouchableOpacity>
+
       <Text style={styles.title}>Pedidos</Text>
 
       {loading ? (
@@ -131,11 +96,7 @@ export default function OrdersPage() {
               <Text>Usuario: {item.user?.name}</Text>
               <Text>Total: ${item.total}</Text>
               <Text>Cantidad: {item.qty}</Text>
-              <Text>Fecha: {formatDate(item.created_at)}</Text>
-              <Text>
-                Entregado:{' '}
-                {item.delivered_at ? formatDate(item.delivered_at) : 'No'}
-              </Text>
+              <Text>Entregado: {item.delivered_at ? 'Sí' : 'No'}</Text>
               <View style={styles.actions}>
                 {!item.delivered_at && (
                   <TouchableOpacity
@@ -145,12 +106,6 @@ export default function OrdersPage() {
                     <Text style={styles.buttonText}>Marcar Entregado</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity
-                  style={[styles.button, { backgroundColor: 'red' }]}
-                  onPress={() => deleteOrder(item.id)}
-                >
-                  <Text style={styles.buttonText}>Eliminar</Text>
-                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -164,6 +119,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+  },
+  backButton: {
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
   },
   title: {
     fontSize: 22,
@@ -182,7 +145,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     marginTop: 10,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   button: {
     padding: 10,

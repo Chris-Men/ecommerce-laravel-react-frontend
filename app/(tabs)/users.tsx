@@ -5,10 +5,12 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  Alert,
+  Modal,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native'; // <-- Importación para navegación
 
 interface User {
   id: number;
@@ -18,9 +20,13 @@ interface User {
 }
 
 const UserManagement: React.FC = () => {
+  const navigation = useNavigation(); // <-- Hook de navegación agregado
+
   const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [isModalVisible, setModalVisible] = useState(false);
 
   const apiUrl = 'http://localhost:8000/api/admin/users';
 
@@ -30,6 +36,7 @@ const UserManagement: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
+      setLoading(true);
       const token = await getToken();
       const response = await fetch(apiUrl, {
         headers: {
@@ -41,40 +48,14 @@ const UserManagement: React.FC = () => {
       setUsers(data.users);
     } catch (error) {
       console.error('Error al obtener usuarios', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchUsers();
   }, []);
-
-  const deleteUser = async (id: number) => {
-    Alert.alert('Confirmación', '¿Estás seguro de eliminar este usuario?', [
-      {
-        text: 'Cancelar',
-        style: 'cancel',
-      },
-      {
-        text: 'Eliminar',
-        onPress: async () => {
-          try {
-            const token = await getToken();
-            await fetch(`${apiUrl}/${id}`, {
-              method: 'DELETE',
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: 'application/json',
-              },
-            });
-            fetchUsers();
-          } catch (error) {
-            console.error('Error al eliminar usuario', error);
-          }
-        },
-        style: 'destructive',
-      },
-    ]);
-  };
 
   const updateUser = async () => {
     if (!editingUser) return;
@@ -91,7 +72,6 @@ const UserManagement: React.FC = () => {
         body: JSON.stringify({
           name: form.name,
           email: form.email,
-          role: form.role,
           password: form.password || undefined,
           password_confirmation: form.password || undefined,
         }),
@@ -109,85 +89,91 @@ const UserManagement: React.FC = () => {
 
   const startEditing = (user: User) => {
     setEditingUser(user);
-    setForm({ name: user.name, email: user.email, password: '', role: user.role });
+    setForm({ name: user.name, email: user.email, password: '' });
+    setModalVisible(true);
   };
 
   const cancelEditing = () => {
     setEditingUser(null);
-    setForm({ name: '', email: '', password: '', role: '' });
+    setForm({ name: '', email: '', password: '' });
+    setModalVisible(false);
   };
 
   return (
     <View style={styles.container}>
+      {/* Botón Volver agregado arriba */}
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Text style={styles.backButtonText}>← Volver</Text>
+      </TouchableOpacity>
+
       <Text style={styles.title}>Gestión de Usuarios</Text>
 
-      {editingUser && (
-        <View style={styles.form}>
-          <Text style={styles.subTitle}>Editar Usuario</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nombre"
-            value={form.name}
-            onChangeText={(text) => setForm({ ...form, name: text })}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Correo"
-            value={form.email}
-            onChangeText={(text) => setForm({ ...form, email: text })}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Nueva contraseña (opcional)"
-            value={form.password}
-            secureTextEntry
-            onChangeText={(text) => setForm({ ...form, password: text })}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Rol"
-            value={form.role}
-            onChangeText={(text) => setForm({ ...form, role: text })}
-          />
-          <View style={styles.buttonRow}>
-            <TouchableOpacity onPress={updateUser} style={styles.saveButton}>
-              <Text style={styles.buttonText}>Guardar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={cancelEditing} style={styles.cancelButton}>
-              <Text style={styles.buttonText}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+      {loading ? (
+        <ActivityIndicator size="large" color="#0d6efd" style={{ marginTop: 20 }} />
+      ) : (
+        <FlatList
+          data={users}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.userItem}>
+              <View>
+                <Text style={styles.userText}>ID: {item.id}</Text>
+                <Text style={styles.userText}>Nombre: {item.name}</Text>
+                <Text style={styles.userText}>Correo: {item.email}</Text>
+                <Text style={styles.userText}>Rol: {item.role}</Text>
+              </View>
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => startEditing(item)}
+                >
+                  <Text style={styles.buttonText}>Editar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        />
       )}
 
-      <FlatList
-        data={users}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.userItem}>
-            <View>
-              <Text style={styles.userText}>ID: {item.id}</Text>
-              <Text style={styles.userText}>Nombre: {item.name}</Text>
-              <Text style={styles.userText}>Correo: {item.email}</Text>
-              <Text style={styles.userText}>Rol: {item.role}</Text>
-            </View>
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => startEditing(item)}
-              >
-                <Text style={styles.buttonText}>Editar</Text>
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={cancelEditing}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.subTitle}>Editar Usuario</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nombre"
+              value={form.name}
+              onChangeText={(text) => setForm({ ...form, name: text })}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Correo"
+              value={form.email}
+              onChangeText={(text) => setForm({ ...form, email: text })}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Nueva contraseña (opcional)"
+              value={form.password}
+              secureTextEntry
+              onChangeText={(text) => setForm({ ...form, password: text })}
+            />
+            <View style={styles.buttonRow}>
+              <TouchableOpacity onPress={updateUser} style={styles.saveButton}>
+                <Text style={styles.buttonText}>Guardar</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => deleteUser(item.id)}
-              >
-                <Text style={styles.buttonText}>Eliminar</Text>
+              <TouchableOpacity onPress={cancelEditing} style={styles.cancelButton}>
+                <Text style={styles.buttonText}>Cancelar</Text>
               </TouchableOpacity>
             </View>
           </View>
-        )}
-      />
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -198,6 +184,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     flex: 1,
   },
+  backButton: {
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -207,12 +201,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 10,
-  },
-  form: {
-    marginBottom: 20,
-    backgroundColor: '#e9ecef',
-    padding: 15,
-    borderRadius: 8,
   },
   input: {
     backgroundColor: '#fff',
@@ -256,17 +244,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   actions: {
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
   editButton: {
     backgroundColor: '#ffc107',
-    padding: 6,
-    borderRadius: 6,
-    marginBottom: 5,
-    alignItems: 'center',
-  },
-  deleteButton: {
-    backgroundColor: '#dc3545',
     padding: 6,
     borderRadius: 6,
     alignItems: 'center',
@@ -274,6 +255,19 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+    width: '90%',
+    elevation: 10,
   },
 });
 

@@ -6,35 +6,37 @@ import {
   Button,
   FlatList,
   TouchableOpacity,
+  Alert,
   SafeAreaView,
   StyleSheet,
   Modal,
-  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native'; // <-- Importación
 
 const API_URL = 'http://localhost:8000/api/admin/brands';
 
-interface Brand {
+type Brand = {
   id: number;
   name: string;
-}
+};
 
 export default function BrandsPage() {
+  const navigation = useNavigation(); // <-- Hook de navegación
+
   const [brands, setBrands] = useState<Brand[]>([]);
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [confirmVisible, setConfirmVisible] = useState(false);
-  const [brandToDelete, setBrandToDelete] = useState<Brand | null>(null);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [brandToDelete, setBrandToDelete] = useState<number | null>(null);
 
   const fetchBrands = async () => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) throw new Error('No se encontró token');
-
       const res = await fetch(API_URL, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -43,12 +45,15 @@ export default function BrandsPage() {
       });
 
       const data = await res.json();
-      if (res.ok) {
-        setBrands(data.brands.sort((a: Brand, b: Brand) => a.id - b.id));
-      } else {
-        Alert.alert('Error', data.message || 'Error al obtener marcas');
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Error al obtener marcas');
       }
+
+      const sortedBrands = data.brands.sort((a: Brand, b: Brand) => a.id - b.id);
+      setBrands(sortedBrands);
     } catch (error: any) {
+      console.error('Error al obtener marcas:', error.message);
       Alert.alert('Error', error.message);
     } finally {
       setLoading(false);
@@ -61,13 +66,11 @@ export default function BrandsPage() {
       return;
     }
 
+    const token = await AsyncStorage.getItem('token');
+    const method = editingId ? 'PUT' : 'POST';
+    const url = editingId ? `${API_URL}/${editingId}` : API_URL;
+
     try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) throw new Error('No se encontró token');
-
-      const url = editingId ? `${API_URL}/${editingId}` : API_URL;
-      const method = editingId ? 'PUT' : 'POST';
-
       const res = await fetch(url, {
         method,
         headers: {
@@ -81,25 +84,27 @@ export default function BrandsPage() {
       const data = await res.json();
 
       if (res.ok) {
-        Alert.alert('Éxito', data.message);
+        Alert.alert(data.message || 'Marca guardada con éxito');
         setName('');
         setEditingId(null);
         setModalVisible(false);
         fetchBrands();
       } else {
-        Alert.alert('Error', data.message || 'Error al guardar');
+        Alert.alert('Error', data.message || 'Error al guardar la marca');
       }
     } catch (error: any) {
+      console.error('Error al guardar marca:', error.message);
       Alert.alert('Error', 'No se pudo guardar la marca');
     }
   };
 
-  const handleDelete = async (id: number) => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) throw new Error('No se encontró token');
+  const handleDelete = async () => {
+    if (brandToDelete === null) return;
 
-      const res = await fetch(`${API_URL}/${id}`, {
+    const token = await AsyncStorage.getItem('token');
+
+    try {
+      const res = await fetch(`${API_URL}/${brandToDelete}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -110,13 +115,17 @@ export default function BrandsPage() {
       const data = await res.json();
 
       if (res.ok) {
-        Alert.alert('Éxito', data.message);
+        Alert.alert(data.message || 'Marca eliminada');
         fetchBrands();
       } else {
-        Alert.alert('Error', data.message || 'Error al eliminar');
+        Alert.alert('Error', data.message || 'Error al eliminar la marca');
       }
     } catch (error: any) {
+      console.error('Error al eliminar marca:', error.message);
       Alert.alert('Error', 'No se pudo eliminar la marca');
+    } finally {
+      setConfirmDeleteVisible(false);
+      setBrandToDelete(null);
     }
   };
 
@@ -132,6 +141,11 @@ export default function BrandsPage() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Botón Volver */}
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Text style={styles.backButtonText}>← Volver</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => {
@@ -146,7 +160,7 @@ export default function BrandsPage() {
       <Text style={styles.listTitle}>Listado de Marcas</Text>
 
       {loading ? (
-        <Text>Cargando...</Text>
+        <ActivityIndicator size="large" color="#0000ff" />
       ) : (
         <FlatList
           data={brands}
@@ -161,8 +175,8 @@ export default function BrandsPage() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => {
-                    setBrandToDelete(item);
-                    setConfirmVisible(true);
+                    setBrandToDelete(item.id);
+                    setConfirmDeleteVisible(true);
                   }}
                 >
                   <Text style={{ color: 'red' }}>Eliminar</Text>
@@ -173,7 +187,7 @@ export default function BrandsPage() {
         />
       )}
 
-      {/* Modal Agregar/Editar */}
+      {/* Modal de agregar/editar */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -186,9 +200,7 @@ export default function BrandsPage() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>
-              {editingId ? 'Editar Marca' : 'Agregar Marca'}
-            </Text>
+            <Text style={styles.modalTitle}>{editingId ? 'Editar Marca' : 'Agregar Marca'}</Text>
 
             <TextInput
               placeholder="Nombre de la marca"
@@ -198,10 +210,7 @@ export default function BrandsPage() {
             />
 
             <View style={styles.modalButtons}>
-              <Button
-                title={editingId ? 'Actualizar' : 'Guardar'}
-                onPress={handleSubmit}
-              />
+              <Button title={editingId ? 'Actualizar' : 'Guardar'} onPress={handleSubmit} />
               <Button
                 title="Cancelar"
                 color="gray"
@@ -216,36 +225,32 @@ export default function BrandsPage() {
         </View>
       </Modal>
 
-      {/* Modal Confirmación de Eliminación */}
+      {/* Modal de confirmación de eliminación */}
       <Modal
-        transparent
-        visible={confirmVisible}
-        onRequestClose={() => setConfirmVisible(false)}
+        animationType="fade"
+        transparent={true}
+        visible={confirmDeleteVisible}
+        onRequestClose={() => {
+          setConfirmDeleteVisible(false);
+          setBrandToDelete(null);
+        }}
       >
         <View style={styles.modalOverlay}>
-  <View style={styles.modalContainer}>
-    <Text style={{ fontSize: 16, marginBottom: 20 }}>
-      ¿Estás seguro de que deseas eliminar la marca?
-    </Text>
-    <View style={styles.modalButtons}>
-      <Button
-        title="Eliminar"
-        color="red"
-        onPress={() => {
-          if (brandToDelete) {
-            handleDelete(brandToDelete.id);
-            setConfirmVisible(false);
-            setBrandToDelete(null);
-          }
-          }}
-      />
-      <Button
-        title="Cancelar"
-        onPress={() => setConfirmVisible(false)}
-      />
-    </View>
-  </View>
-</View>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>¿Eliminar marca?</Text>
+            <Text style={{ marginBottom: 20 }}>¿Estás seguro de que deseas eliminar la marca?</Text>
+            <View style={styles.modalButtons}>
+              <Button title="Eliminar" onPress={handleDelete} color="red" />
+              <Button
+                title="Cancelar"
+                onPress={() => {
+                  setConfirmDeleteVisible(false);
+                  setBrandToDelete(null);
+                }}
+              />
+            </View>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -255,6 +260,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+  },
+  backButton: {
+    marginBottom: 10,
+  },
+  backButtonText: {
+    color: '#007bff',
+    fontSize: 16,
   },
   addButton: {
     backgroundColor: '#28a745',
@@ -295,6 +307,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 20,
     elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   modalTitle: {
     fontSize: 20,
