@@ -10,19 +10,26 @@ import {
   SafeAreaView,
   StyleSheet,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = 'http://localhost:8000/api/admin/colors';
 
+type Color = {
+  id: number;
+  name: string;
+};
+
 export default function ColorsPage() {
-  const [colors, setColors] = useState([]);
+  const [colors, setColors] = useState<Color[]>([]);
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [colorToDelete, setColorToDelete] = useState<number | null>(null);
 
-  // Obtener lista de colores
   const fetchColors = async () => {
     setLoading(true);
     try {
@@ -34,13 +41,13 @@ export default function ColorsPage() {
         },
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al obtener colores');
+        throw new Error(data.message || 'Error al obtener colores');
       }
 
-      const data = await res.json();
-      const sortedColors = data.colors.sort((a, b) => a.id - b.id);
+      const sortedColors = data.colors.sort((a: Color, b: Color) => a.id - b.id);
       setColors(sortedColors);
     } catch (error: any) {
       console.error('Error al obtener colores:', error.message);
@@ -50,7 +57,6 @@ export default function ColorsPage() {
     }
   };
 
-  // Crear o actualizar color
   const handleSubmit = async () => {
     if (name.trim() === '') {
       Alert.alert('Validación', 'El nombre no puede estar vacío.');
@@ -75,7 +81,7 @@ export default function ColorsPage() {
       const data = await res.json();
 
       if (res.ok) {
-        Alert.alert(data.message);
+        Alert.alert(data.message || 'Color guardado con éxito');
         setName('');
         setEditingId(null);
         setModalVisible(false);
@@ -89,12 +95,13 @@ export default function ColorsPage() {
     }
   };
 
-  // Eliminar color
-  const handleDelete = async (id: number) => {
+  const handleDelete = async () => {
+    if (colorToDelete === null) return;
+
     const token = await AsyncStorage.getItem('token');
 
     try {
-      const res = await fetch(`${API_URL}/${id}`, {
+      const res = await fetch(`${API_URL}/${colorToDelete}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -105,19 +112,21 @@ export default function ColorsPage() {
       const data = await res.json();
 
       if (res.ok) {
-        Alert.alert(data.message);
+        Alert.alert(data.message || 'Color eliminado');
         fetchColors();
       } else {
-        Alert.alert('Error', data.message || 'Error al eliminar');
+        Alert.alert('Error', data.message || 'Error al eliminar el color');
       }
-    } catch (error) {
-      console.error('Error al eliminar color:', error);
+    } catch (error: any) {
+      console.error('Error al eliminar color:', error.message);
       Alert.alert('Error', 'No se pudo eliminar el color');
+    } finally {
+      setConfirmDeleteVisible(false);
+      setColorToDelete(null);
     }
   };
 
-  // Preparar edición
-  const handleEdit = (color: any) => {
+  const handleEdit = (color: Color) => {
     setName(color.name);
     setEditingId(color.id);
     setModalVisible(true);
@@ -143,7 +152,7 @@ export default function ColorsPage() {
       <Text style={styles.listTitle}>Listado de Colores</Text>
 
       {loading ? (
-        <Text>Cargando...</Text>
+        <ActivityIndicator size="large" color="#0000ff" />
       ) : (
         <FlatList
           data={colors}
@@ -157,16 +166,10 @@ export default function ColorsPage() {
                   <Text style={{ color: 'blue', marginRight: 15 }}>Editar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() =>
-                    Alert.alert(
-                      'Confirmar eliminación',
-                      '¿Está seguro de eliminar este color?',
-                      [
-                        { text: 'Cancelar', style: 'cancel' },
-                        { text: 'Eliminar', onPress: () => handleDelete(item.id), style: 'destructive' },
-                      ]
-                    )
-                  }
+                  onPress={() => {
+                    setColorToDelete(item.id);
+                    setConfirmDeleteVisible(true);
+                  }}
                 >
                   <Text style={{ color: 'red' }}>Eliminar</Text>
                 </TouchableOpacity>
@@ -176,6 +179,7 @@ export default function ColorsPage() {
         />
       )}
 
+      {/* Modal de agregar/editar */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -206,6 +210,34 @@ export default function ColorsPage() {
                   setModalVisible(false);
                   setName('');
                   setEditingId(null);
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de confirmación de eliminación */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={confirmDeleteVisible}
+        onRequestClose={() => {
+          setConfirmDeleteVisible(false);
+          setColorToDelete(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>¿Eliminar color?</Text>
+            <Text style={{ marginBottom: 20 }}>¿Estás seguro de que deseas eliminar el color?</Text>
+            <View style={styles.modalButtons}>
+              <Button title="Eliminar" onPress={handleDelete} color="red" />
+              <Button
+                title="Cancelar"
+                onPress={() => {
+                  setConfirmDeleteVisible(false);
+                  setColorToDelete(null);
                 }}
               />
             </View>

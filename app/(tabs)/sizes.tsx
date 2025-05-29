@@ -10,29 +10,30 @@ import {
   SafeAreaView,
   StyleSheet,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://localhost:8000/api/admin/sizes'; // Cambia a la ruta correcta
+const API_URL = 'http://localhost:8000/api/admin/sizes';
+
+type Size = {
+  id: number;
+  name: string;
+};
 
 export default function SizesPage() {
-  const [sizes, setSizes] = useState<any[]>([]);
+  const [sizes, setSizes] = useState<Size[]>([]);
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [sizeToDelete, setSizeToDelete] = useState<number | null>(null);
 
-  // Obtener lista de tallas
   const fetchSizes = async () => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        Alert.alert('Error', 'No se encontró token de autenticación');
-        setLoading(false);
-        return;
-      }
-
       const res = await fetch(API_URL, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -40,39 +41,32 @@ export default function SizesPage() {
         },
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al obtener tallas');
+        throw new Error(data.message || 'Error al obtener tallas');
       }
 
-      const data = await res.json();
-      const sortedSizes = data.sizes.sort((a: any, b: any) => a.id - b.id);
+      const sortedSizes = data.sizes.sort((a: Size, b: Size) => a.id - b.id);
       setSizes(sortedSizes);
     } catch (error: any) {
-      console.error('Error al obtener tallas:', error?.message ?? error);
-      Alert.alert('Error', error?.message ?? 'Error desconocido al obtener tallas');
+      Alert.alert('Error', error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Crear o actualizar talla
   const handleSubmit = async () => {
     if (name.trim() === '') {
       Alert.alert('Validación', 'El nombre no puede estar vacío.');
       return;
     }
 
+    const token = await AsyncStorage.getItem('token');
+    const method = editingId ? 'PUT' : 'POST';
+    const url = editingId ? `${API_URL}/${editingId}` : API_URL;
+
     try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        Alert.alert('Error', 'No se encontró token de autenticación');
-        return;
-      }
-
-      const method = editingId ? 'PUT' : 'POST';
-      const url = editingId ? `${API_URL}/${editingId}` : API_URL;
-
       const res = await fetch(url, {
         method,
         headers: {
@@ -86,30 +80,26 @@ export default function SizesPage() {
       const data = await res.json();
 
       if (res.ok) {
-        Alert.alert(data.message);
+        Alert.alert(data.message || 'Talla guardada con éxito');
         setName('');
         setEditingId(null);
         setModalVisible(false);
-        await fetchSizes(); // Espera antes de continuar
+        fetchSizes();
       } else {
         Alert.alert('Error', data.message || 'Error al guardar la talla');
       }
     } catch (error: any) {
-      console.error('Error al guardar talla:', error?.message ?? error);
       Alert.alert('Error', 'No se pudo guardar la talla');
     }
   };
 
-  // Eliminar talla
-  const handleDelete = async (id: number) => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        Alert.alert('Error', 'No se encontró token de autenticación');
-        return;
-      }
+  const handleDelete = async () => {
+    if (sizeToDelete === null) return;
 
-      const res = await fetch(`${API_URL}/${id}`, {
+    const token = await AsyncStorage.getItem('token');
+
+    try {
+      const res = await fetch(`${API_URL}/${sizeToDelete}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -120,19 +110,20 @@ export default function SizesPage() {
       const data = await res.json();
 
       if (res.ok) {
-        Alert.alert(data.message);
-        await fetchSizes(); // Espera actualización
+        Alert.alert(data.message || 'Talla eliminada');
+        fetchSizes();
       } else {
-        Alert.alert('Error', data.message || 'Error al eliminar');
+        Alert.alert('Error', data.message || 'Error al eliminar la talla');
       }
-    } catch (error) {
-      console.error('Error al eliminar talla:', error);
+    } catch (error: any) {
       Alert.alert('Error', 'No se pudo eliminar la talla');
+    } finally {
+      setConfirmDeleteVisible(false);
+      setSizeToDelete(null);
     }
   };
 
-  // Preparar edición
-  const handleEdit = (size: any) => {
+  const handleEdit = (size: Size) => {
     setName(size.name);
     setEditingId(size.id);
     setModalVisible(true);
@@ -158,7 +149,7 @@ export default function SizesPage() {
       <Text style={styles.listTitle}>Listado de Tallas</Text>
 
       {loading ? (
-        <Text>Cargando...</Text>
+        <ActivityIndicator size="large" color="#0000ff" />
       ) : (
         <FlatList
           data={sizes}
@@ -172,20 +163,10 @@ export default function SizesPage() {
                   <Text style={{ color: 'blue', marginRight: 15 }}>Editar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() =>
-                    Alert.alert(
-                      'Confirmar eliminación',
-                      '¿Está seguro de eliminar esta talla?',
-                      [
-                        { text: 'Cancelar', style: 'cancel' },
-                        {
-                          text: 'Eliminar',
-                          onPress: () => handleDelete(item.id),
-                          style: 'destructive',
-                        },
-                      ]
-                    )
-                  }
+                  onPress={() => {
+                    setSizeToDelete(item.id);
+                    setConfirmDeleteVisible(true);
+                  }}
                 >
                   <Text style={{ color: 'red' }}>Eliminar</Text>
                 </TouchableOpacity>
@@ -195,9 +176,10 @@ export default function SizesPage() {
         />
       )}
 
+      {/* Modal agregar/editar */}
       <Modal
         animationType="slide"
-        transparent={true}
+        transparent
         visible={modalVisible}
         onRequestClose={() => {
           setModalVisible(false);
@@ -208,14 +190,12 @@ export default function SizesPage() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>{editingId ? 'Editar Talla' : 'Agregar Talla'}</Text>
-
             <TextInput
               placeholder="Nombre de la talla"
               value={name}
               onChangeText={setName}
               style={styles.input}
             />
-
             <View style={styles.modalButtons}>
               <Button title={editingId ? 'Actualizar' : 'Guardar'} onPress={handleSubmit} />
               <Button
@@ -225,6 +205,34 @@ export default function SizesPage() {
                   setModalVisible(false);
                   setName('');
                   setEditingId(null);
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal confirmación eliminación */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={confirmDeleteVisible}
+        onRequestClose={() => {
+          setConfirmDeleteVisible(false);
+          setSizeToDelete(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>¿Eliminar talla?</Text>
+            <Text style={{ marginBottom: 20 }}>¿Estás seguro de que deseas eliminar esta talla?</Text>
+            <View style={styles.modalButtons}>
+              <Button title="Eliminar" onPress={handleDelete} color="red" />
+              <Button
+                title="Cancelar"
+                onPress={() => {
+                  setConfirmDeleteVisible(false);
+                  setSizeToDelete(null);
                 }}
               />
             </View>

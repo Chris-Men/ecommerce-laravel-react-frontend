@@ -6,10 +6,10 @@ import {
   Button,
   FlatList,
   TouchableOpacity,
-  Alert,
   SafeAreaView,
   StyleSheet,
   Modal,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -26,12 +26,14 @@ export default function BrandsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [brandToDelete, setBrandToDelete] = useState<Brand | null>(null);
 
   const fetchBrands = async () => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) throw new Error('No se encontró token de autenticación');
+      if (!token) throw new Error('No se encontró token');
 
       const res = await fetch(API_URL, {
         headers: {
@@ -40,16 +42,13 @@ export default function BrandsPage() {
         },
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error al obtener marcas');
-      }
-
       const data = await res.json();
-      const sortedBrands: Brand[] = data.brands.sort((a: Brand, b: Brand) => a.id - b.id);
-      setBrands(sortedBrands);
+      if (res.ok) {
+        setBrands(data.brands.sort((a: Brand, b: Brand) => a.id - b.id));
+      } else {
+        Alert.alert('Error', data.message || 'Error al obtener marcas');
+      }
     } catch (error: any) {
-      console.error('Error al obtener marcas:', error.message);
       Alert.alert('Error', error.message);
     } finally {
       setLoading(false);
@@ -64,10 +63,10 @@ export default function BrandsPage() {
 
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) throw new Error('No se encontró token de autenticación');
+      if (!token) throw new Error('No se encontró token');
 
-      const method = editingId ? 'PUT' : 'POST';
       const url = editingId ? `${API_URL}/${editingId}` : API_URL;
+      const method = editingId ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,
@@ -88,10 +87,9 @@ export default function BrandsPage() {
         setModalVisible(false);
         fetchBrands();
       } else {
-        Alert.alert('Error', data.message || 'Error al guardar la marca');
+        Alert.alert('Error', data.message || 'Error al guardar');
       }
     } catch (error: any) {
-      console.error('Error al guardar marca:', error.message);
       Alert.alert('Error', 'No se pudo guardar la marca');
     }
   };
@@ -99,7 +97,7 @@ export default function BrandsPage() {
   const handleDelete = async (id: number) => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) throw new Error('No se encontró token de autenticación');
+      if (!token) throw new Error('No se encontró token');
 
       const res = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
@@ -118,7 +116,6 @@ export default function BrandsPage() {
         Alert.alert('Error', data.message || 'Error al eliminar');
       }
     } catch (error: any) {
-      console.error('Error al eliminar marca:', error.message);
       Alert.alert('Error', 'No se pudo eliminar la marca');
     }
   };
@@ -162,16 +159,12 @@ export default function BrandsPage() {
                 <TouchableOpacity onPress={() => handleEdit(item)}>
                   <Text style={{ color: 'blue', marginRight: 15 }}>Editar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() =>
-                  Alert.alert(
-                    'Confirmar eliminación',
-                    `¿Seguro que quieres eliminar la marca "${item.name}"?`,
-                    [
-                      { text: 'Cancelar', style: 'cancel' },
-                      { text: 'Eliminar', style: 'destructive', onPress: () => handleDelete(item.id) },
-                    ]
-                  )
-                }>
+                <TouchableOpacity
+                  onPress={() => {
+                    setBrandToDelete(item);
+                    setConfirmVisible(true);
+                  }}
+                >
                   <Text style={{ color: 'red' }}>Eliminar</Text>
                 </TouchableOpacity>
               </View>
@@ -180,6 +173,7 @@ export default function BrandsPage() {
         />
       )}
 
+      {/* Modal Agregar/Editar */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -201,7 +195,6 @@ export default function BrandsPage() {
               value={name}
               onChangeText={setName}
               style={styles.input}
-              autoFocus
             />
 
             <View style={styles.modalButtons}>
@@ -221,6 +214,38 @@ export default function BrandsPage() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Modal Confirmación de Eliminación */}
+      <Modal
+        transparent
+        visible={confirmVisible}
+        onRequestClose={() => setConfirmVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+  <View style={styles.modalContainer}>
+    <Text style={{ fontSize: 16, marginBottom: 20 }}>
+      ¿Estás seguro de que deseas eliminar la marca?
+    </Text>
+    <View style={styles.modalButtons}>
+      <Button
+        title="Eliminar"
+        color="red"
+        onPress={() => {
+          if (brandToDelete) {
+            handleDelete(brandToDelete.id);
+            setConfirmVisible(false);
+            setBrandToDelete(null);
+          }
+          }}
+      />
+      <Button
+        title="Cancelar"
+        onPress={() => setConfirmVisible(false)}
+      />
+    </View>
+  </View>
+</View>
       </Modal>
     </SafeAreaView>
   );
@@ -257,7 +282,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    // gap no funciona en React Native, usar marginRight en texto
   },
   modalOverlay: {
     flex: 1,
@@ -271,10 +295,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 20,
     elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
   },
   modalTitle: {
     fontSize: 20,
