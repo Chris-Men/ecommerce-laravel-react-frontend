@@ -18,15 +18,16 @@ import {
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 
+const API_URL = 'http://localhost:8000/api';
+
 type Product = {
-  thumbnail: any;
   id: number;
   name: string;
   description: string;
   price: number | string;
   qty: number | string;
   status?: boolean;
-  image_url?: string;
+  image?: string;
   category?: { id: number; name: string };
   brand?: { id: number; name: string };
   size?: { id: number; name: string };
@@ -57,7 +58,7 @@ export default function AdminProductsScreen() {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/admin/products', {
+      const response = await fetch(`${API_URL}/admin/products`, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
@@ -66,14 +67,71 @@ export default function AdminProductsScreen() {
       const data = await response.json();
       setProducts(data.data);
     } catch (error) {
-      console.error('Error al cargar productos:', error);
       Alert.alert('Error', 'No se pudo cargar la lista de productos.');
     } finally {
       setLoading(false);
     }
   };
 
+  const resetForm = () => {
+    setName('');
+    setDescription('');
+    setPrice('');
+    setQty('');
+    setCategoryId('');
+    setBrandId('');
+    setSizeId('');
+    setColorId('');
+    setImage(null);
+    setEditingProduct(null);
+  };
+
+  const handleEdit = (product: Product) => {
+    setEditingProduct(product);
+    setName(product.name);
+    setDescription(product.description);
+    setPrice(product.price.toString());
+    setQty(product.qty.toString());
+    setCategoryId(product.category?.id.toString() || '');
+    setBrandId(product.brand?.id.toString() || '');
+    setSizeId(product.size?.id.toString() || '');
+    setColorId(product.color?.id.toString() || '');
+    setModalVisible(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    Alert.alert('Confirmar', '¿Seguro que quieres eliminar este producto?', [
+      { text: 'Cancelar' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const token = await AsyncStorage.getItem('token');
+            const response = await fetch(`${API_URL}/admin/products/${id}`, {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/json',
+              },
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.message || 'Error al eliminar');
+            }
+
+            fetchProducts();
+          } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo eliminar el producto');
+          }
+        },
+      },
+    ]);
+  };
+
   const handleSelectImage = () => {
+    if (Platform.OS === 'web') return;
     launchImageLibrary({ mediaType: 'photo' }, (response) => {
       if (response.didCancel) return;
       if (response.errorCode) {
@@ -105,24 +163,26 @@ export default function AdminProductsScreen() {
       formData.append('size_id', size_id);
       formData.append('color_id', color_id);
 
-      if (image && image.uri && !image.uri.includes('localhost:8000/storage')) {
-        const filename = image.fileName || image.uri.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename || '');
-        const type = match ? `image/${match[1]}` : 'image';
-
-        formData.append('image', {
-          uri: image.uri,
-          type,
-          name: filename,
-        } as any);
+      if (image) {
+        if (Platform.OS === 'web') {
+          formData.append('image', image);
+        } else if (image.uri) {
+          const fileName = image.fileName || image.uri.split('/').pop() || 'photo.jpg';
+          const ext = fileName.split('.').pop()?.toLowerCase();
+          const type = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+          formData.append('image', {
+            uri: image.uri,
+            name: fileName,
+            type,
+          } as any);
+        }
       }
 
       const isEdit = !!editingProduct;
       const url = isEdit
-        ? `http://localhost:8000/api/admin/products/${editingProduct.id}`
-        : 'http://localhost:8000/api/admin/products';
-
-      const method = 'POST';
+        ? `${API_URL}/admin/products/${editingProduct.id}`
+        : `${API_URL}/admin/products`;
+      const method = isEdit ? 'POST' : 'POST';
       if (isEdit) formData.append('_method', 'PUT');
 
       const response = await fetch(url, {
@@ -134,83 +194,21 @@ export default function AdminProductsScreen() {
         body: formData,
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error:', errorData);
-        Alert.alert('Error', isEdit ? 'No se pudo actualizar el producto' : 'No se pudo agregar el producto');
+        console.log('Errores de validación:', responseData.errors);
+        Alert.alert('Error', Object.values(responseData.errors || {}).flat().join('\n'));
         return;
       }
 
-      Alert.alert('Éxito', isEdit ? 'Producto actualizado correctamente' : 'Producto agregado correctamente');
+      Alert.alert('Éxito', isEdit ? 'Producto actualizado' : 'Producto creado');
       setModalVisible(false);
-      fetchProducts();
       resetForm();
+      fetchProducts();
     } catch (error) {
-      console.error('Error al guardar producto:', error);
       Alert.alert('Error', 'Error inesperado al guardar el producto');
     }
-  };
-
-  const resetForm = () => {
-    setName('');
-    setDescription('');
-    setPrice('');
-    setQty('');
-    setCategoryId('');
-    setBrandId('');
-    setSizeId('');
-    setColorId('');
-    setImage(null);
-    setEditingProduct(null);
-  };
-
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product);
-    setName(product.name);
-    setDescription(product.description);
-    setPrice(product.price.toString());
-    setQty(product.qty.toString());
-    setCategoryId(product.category?.id?.toString() || '');
-    setBrandId(product.brand?.id?.toString() || '');
-    setSizeId(product.size?.id?.toString() || '');
-    setColorId(product.color?.id?.toString() || '');
-    setImage(product.thumbnail ? { uri: `http://localhost:8000/storage/${product.thumbnail}` } : null);
-    setModalVisible(true);
-  };
-
-  const handleDelete = async (id: number) => {
-    Alert.alert('Confirmar', '¿Estás seguro que deseas eliminar este producto?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const token = await AsyncStorage.getItem('token');
-            const response = await fetch(`http://localhost:8000/api/admin/products/${id}`, {
-              method: 'DELETE',
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: 'application/json',
-              },
-            });
-
-            if (!response.ok) {
-              const errorData = await response.json();
-              console.error('Error:', errorData);
-              Alert.alert('Error', 'No se pudo eliminar el producto');
-              return;
-            }
-
-            Alert.alert('Éxito', 'Producto eliminado correctamente');
-            fetchProducts();
-          } catch (error) {
-            console.error('Error al eliminar producto:', error);
-            Alert.alert('Error', 'Error inesperado al eliminar el producto');
-          }
-        },
-      },
-    ]);
   };
 
   if (loading) {
@@ -231,15 +229,8 @@ export default function AdminProductsScreen() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <Text style={styles.name}>{item.name}</Text>
-            {item.thumbnail ? (
-              <Image
-                source={{
-                  uri: item.thumbnail.startsWith('http')
-                    ? item.thumbnail
-                    : `http://localhost:8000/storage/${item.thumbnail}`,
-                }}
-                style={styles.productImage}
-              />
+            {item.image ? (
+              <Image source={{ uri: item.image }} style={styles.productImage} />
             ) : (
               <Text style={{ color: 'gray' }}>Sin imagen disponible</Text>
             )}
@@ -267,10 +258,15 @@ export default function AdminProductsScreen() {
           resetForm();
         }}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalWrapper}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalWrapper}
+        >
           <View style={styles.modalContent}>
             <ScrollView>
-              <Text style={styles.modalTitle}>{editingProduct ? 'Editar Producto' : 'Agregar Nuevo Producto'}</Text>
+              <Text style={styles.modalTitle}>
+                {editingProduct ? 'Editar Producto' : 'Agregar Nuevo Producto'}
+              </Text>
               <TextInput placeholder="Nombre" style={styles.input} value={name} onChangeText={setName} />
               <TextInput
                 placeholder="Descripción"
@@ -280,13 +276,29 @@ export default function AdminProductsScreen() {
                 multiline
               />
               <TextInput placeholder="Precio" style={styles.input} keyboardType="numeric" value={price} onChangeText={setPrice} />
-              <TextInput placeholder="Cantidad (qty)" style={styles.input} keyboardType="numeric" value={qty} onChangeText={setQty} />
+              <TextInput placeholder="Cantidad" style={styles.input} keyboardType="numeric" value={qty} onChangeText={setQty} />
               <TextInput placeholder="ID Categoría" style={styles.input} value={category_id} onChangeText={setCategoryId} />
               <TextInput placeholder="ID Marca" style={styles.input} value={brand_id} onChangeText={setBrandId} />
               <TextInput placeholder="ID Tamaño" style={styles.input} value={size_id} onChangeText={setSizeId} />
               <TextInput placeholder="ID Color" style={styles.input} value={color_id} onChangeText={setColorId} />
               <Button title="Seleccionar Imagen" onPress={handleSelectImage} />
-              {image && <Image source={{ uri: image.uri }} style={{ width: '100%', height: 150, marginVertical: 10 }} />}
+              {Platform.OS === 'web' && (
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ marginVertical: 10 }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setImage(file);
+                  }}
+                />
+              )}
+              {image && (
+                <Image
+                  source={{ uri: Platform.OS === 'web' ? URL.createObjectURL(image) : image.uri }}
+                  style={{ width: '100%', height: 150, marginVertical: 10 }}
+                />
+              )}
               <Button title={editingProduct ? 'Actualizar Producto' : 'Guardar Producto'} onPress={handleSaveProduct} />
               <Button title="Cancelar" onPress={() => { setModalVisible(false); resetForm(); }} color="gray" />
             </ScrollView>
