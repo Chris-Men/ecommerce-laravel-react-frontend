@@ -1,16 +1,25 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Button,
+  Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  Modal,
-  StyleSheet,
-  ActivityIndicator,
+  useWindowDimensions,
+  View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native'; // <-- Importación para navegación
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 interface User {
   id: number;
@@ -19,50 +28,94 @@ interface User {
   role: string;
 }
 
-const UserManagement: React.FC = () => {
-  const navigation = useNavigation(); // <-- Hook de navegación agregado
+const API_URL = 'http://localhost:8000/api/admin/users';
+
+export default function UserManagement() {
+  const { width } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
+  const isMobile = !isWeb;
+
+  // En web sidebar un poco más angosto, en móvil el ancho fijo 180
+  const SIDEBAR_WIDTH = isWeb ? 140 : 180;
 
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [form, setForm] = useState({ name: '', email: '', password: '' });
-  const [isModalVisible, setModalVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const apiUrl = 'http://localhost:8000/api/admin/users';
+  const routes = [
+    { path: '/admins', label: 'Admins' },
+    { path: '/brands', label: 'Brands' },
+    { path: '/categories', label: 'Categories' },
+    { path: '/colors', label: 'Colors' },
+    { path: '/coupons', label: 'Coupons' },
+    { path: '/orders', label: 'Orders' },
+    { path: '/products', label: 'Products' },
+    { path: '/reviews', label: 'Reviews' },
+    { path: '/sizes', label: 'Sizes' },
+    { path: '/users', label: 'Users' },
+  ] as const;
 
   const getToken = async () => {
     return await AsyncStorage.getItem('token');
   };
 
   const fetchUsers = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const token = await getToken();
-      const response = await fetch(apiUrl, {
+      const response = await fetch(API_URL, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
         },
       });
+
       const data = await response.json();
-      setUsers(data.users);
-    } catch (error) {
-      console.error('Error al obtener usuarios', error);
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al obtener usuarios');
+      }
+
+      const sortedUsers = data.users.sort((a: User, b: User) => a.id - b.id);
+      setUsers(sortedUsers);
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  const showSuccessMessage = (msg: string) => {
+    setSuccessMessage(msg);
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  const startEditing = (user: User) => {
+    setEditingUser(user);
+    setForm({ name: user.name, email: user.email, password: '' });
+    setModalVisible(true);
+  };
+
+  const cancelEditing = () => {
+    setEditingUser(null);
+    setForm({ name: '', email: '', password: '' });
+    setModalVisible(false);
+  };
 
   const updateUser = async () => {
     if (!editingUser) return;
 
+    if (form.name.trim() === '' || form.email.trim() === '') {
+      Alert.alert('Validación', 'El nombre y email son obligatorios.');
+      return;
+    }
+
     try {
       const token = await getToken();
-      const response = await fetch(`${apiUrl}/${editingUser.id}`, {
+      const response = await fetch(`${API_URL}/${editingUser.id}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -78,197 +131,278 @@ const UserManagement: React.FC = () => {
       });
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Error actualizando usuario');
 
-      fetchUsers();
-      cancelEditing();
-    } catch (error) {
-      console.error('Error al actualizar usuario', error);
+      if (response.ok) {
+        showSuccessMessage('Usuario actualizado con éxito');
+        fetchUsers();
+        cancelEditing();
+      } else {
+        Alert.alert('Error', result.message || 'Error al actualizar usuario');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', 'No se pudo actualizar el usuario');
     }
   };
 
-  const startEditing = (user: User) => {
-    setEditingUser(user);
-    setForm({ name: user.name, email: user.email, password: '' });
-    setModalVisible(true);
-  };
-
-  const cancelEditing = () => {
-    setEditingUser(null);
-    setForm({ name: '', email: '', password: '' });
-    setModalVisible(false);
-  };
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   return (
-    <View style={styles.container}>
-      {/* Botón Volver agregado arriba */}
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Text style={styles.backButtonText}>← Volver</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Gestión de Usuarios</Text>
-
-      {loading ? (
-        <ActivityIndicator size="large" color="#0d6efd" style={{ marginTop: 20 }} />
-      ) : (
-        <FlatList
-          data={users}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.userItem}>
-              <View>
-                <Text style={styles.userText}>ID: {item.id}</Text>
-                <Text style={styles.userText}>Nombre: {item.name}</Text>
-                <Text style={styles.userText}>Correo: {item.email}</Text>
-                <Text style={styles.userText}>Rol: {item.role}</Text>
-              </View>
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => startEditing(item)}
-                >
-                  <Text style={styles.buttonText}>Editar</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={[styles.container]}>
+        {/* Sidebar */}
+        <View style={[styles.sidebar, { width: SIDEBAR_WIDTH }]}>
+          <View style={styles.logoDetails}>
+            <Text style={styles.logoText}>🛒 MyStore</Text>
+          </View>
+          <ScrollView style={styles.navLinks}>
+            {routes.map((route) => (
+              <Link
+                href={route.path}
+                key={route.path}
+                style={styles.linkContainer}
+                asChild
+              >
+                <TouchableOpacity>
+                  <Text style={styles.navLinkText}>{route.label}</Text>
                 </TouchableOpacity>
-              </View>
+              </Link>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Main content */}
+        <View style={styles.homeSection}>
+          <Text style={styles.welcomeText}>👥 Usuarios</Text>
+
+          {successMessage && (
+            <View style={styles.successMessageContainer}>
+              <Text style={styles.successMessageText}>{successMessage}</Text>
             </View>
           )}
-        />
-      )}
 
-      <Modal
-        visible={isModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={cancelEditing}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.subTitle}>Editar Usuario</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nombre"
-              value={form.name}
-              onChangeText={(text) => setForm({ ...form, name: text })}
+          {loading ? (
+            <ActivityIndicator size="large" color="#4e8cff" />
+          ) : (
+            <FlatList
+              data={users}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              renderItem={({ item }) => (
+                <View style={[styles.card, { backgroundColor: '#fff' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        { fontSize: 16, fontWeight: '600', marginBottom: 4, color: '#11101d' },
+                        isMobile ? { marginLeft: 20 } : {},
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text
+                      style={[
+                        { fontSize: 14, color: '#666', marginBottom: 2 },
+                        isMobile ? { marginLeft: 20 } : {},
+                      ]}
+                    >
+                      📧 {item.email}
+                    </Text>
+                    <Text
+                      style={[
+                        { fontSize: 14, color: '#666', marginBottom: 2 },
+                        isMobile ? { marginLeft: 20 } : {},
+                      ]}
+                    >
+                      🆔 ID: {item.id}
+                    </Text>
+                    <Text
+                      style={[
+                        { 
+                          fontSize: 14, 
+                          color: item.role === 'admin' ? '#4e8cff' : '#28a745',
+                          fontWeight: '500'
+                        },
+                        isMobile ? { marginLeft: 20 } : {},
+                      ]}
+                    >
+                      👤 {item.role.charAt(0).toUpperCase() + item.role.slice(1)}
+                    </Text>
+                  </View>
+                  <View style={{ justifyContent: 'center' }}>
+                    <TouchableOpacity onPress={() => startEditing(item)}>
+                      <Text style={{ color: '#4e8cff', fontWeight: '500' }}>Editar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Correo"
-              value={form.email}
-              onChangeText={(text) => setForm({ ...form, email: text })}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Nueva contraseña (opcional)"
-              value={form.password}
-              secureTextEntry
-              onChangeText={(text) => setForm({ ...form, password: text })}
-            />
-            <View style={styles.buttonRow}>
-              <TouchableOpacity onPress={updateUser} style={styles.saveButton}>
-                <Text style={styles.buttonText}>Guardar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={cancelEditing} style={styles.cancelButton}>
-                <Text style={styles.buttonText}>Cancelar</Text>
-              </TouchableOpacity>
+          )}
+
+          {/* Modal editar usuario */}
+          <Modal animationType="fade" transparent visible={modalVisible}>
+            <View style={styles.modalOverlay}>
+              <View
+                style={[
+                  styles.modalContainer,
+                  isWeb
+                    ? { width: 350 } // un poco más ancho para los campos del usuario
+                    : { width: '90%' }, // ancho móvil
+                ]}
+              >
+                <Text style={styles.modalTitle}>Editar Usuario</Text>
+                
+                <TextInput
+                  placeholder="Nombre"
+                  value={form.name}
+                  onChangeText={(text) => setForm({ ...form, name: text })}
+                  style={styles.input}
+                  placeholderTextColor="#888"
+                />
+                
+                <TextInput
+                  placeholder="Correo electrónico"
+                  value={form.email}
+                  onChangeText={(text) => setForm({ ...form, email: text })}
+                  style={styles.input}
+                  placeholderTextColor="#888"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+                
+                <TextInput
+                  placeholder="Nueva contraseña (opcional)"
+                  value={form.password}
+                  onChangeText={(text) => setForm({ ...form, password: text })}
+                  style={styles.input}
+                  placeholderTextColor="#888"
+                  secureTextEntry
+                />
+                
+                <View style={styles.modalButtons}>
+                  <Button title="Actualizar" onPress={updateUser} />
+                  <Button
+                    title="Cancelar"
+                    color="gray"
+                    onPress={cancelEditing}
+                  />
+                </View>
+              </View>
             </View>
-          </View>
+          </Modal>
         </View>
-      </Modal>
-    </View>
+      </View>
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f5f5f5' },
+
   container: {
-    padding: 20,
-    backgroundColor: '#f8f9fa',
     flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#f5f5f5',
   },
-  backButton: {
+  sidebar: {
+    height: SCREEN_HEIGHT,
+    backgroundColor: '#11101d',
+    paddingTop: 20,
+  },
+  logoDetails: {
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 10,
-    alignSelf: 'flex-start',
   },
-  backButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
+  logoText: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '600',
   },
-  title: {
+  navLinks: {
+    paddingLeft: 10,
+  },
+  linkContainer: {
+    backgroundColor: '#1d1b31',
+    marginVertical: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  navLinkText: {
+    color: '#fff',
+    fontSize: 18,
+  },
+  homeSection: {
+    flex: 1,
+    padding: 20,
+  },
+  welcomeText: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '500',
+    color: '#11101d',
     marginBottom: 20,
   },
-  subTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderColor: '#ced4da',
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 10,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  saveButton: {
-    backgroundColor: '#0d6efd',
-    padding: 10,
-    borderRadius: 6,
-    flex: 1,
-    marginRight: 5,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#6c757d',
-    padding: 10,
-    borderRadius: 6,
-    flex: 1,
-    marginLeft: 5,
-    alignItems: 'center',
-  },
-  userItem: {
-    backgroundColor: '#fff',
+
+  card: {
     padding: 15,
-    marginBottom: 10,
-    borderRadius: 8,
+    borderRadius: 10,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     elevation: 2,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  userText: {
-    marginBottom: 2,
-    fontSize: 14,
-  },
-  actions: {
-    justifyContent: 'center',
-  },
-  editButton: {
-    backgroundColor: '#ffc107',
-    padding: 6,
-    borderRadius: 6,
     alignItems: 'center',
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
+
   modalOverlay: {
     flex: 1,
+    backgroundColor: '#000000aa',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  modalContent: {
-    backgroundColor: '#fff',
+  modalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 15,
     padding: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 15,
+    fontSize: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+
+  successMessageContainer: {
+    backgroundColor: '#4caf50',
+    paddingVertical: 10,
+    marginBottom: 15,
     borderRadius: 10,
-    width: '90%',
-    elevation: 10,
+  },
+  successMessageText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: '600',
   },
 });
-
-export default UserManagement;

@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Button, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useRouter, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Link, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Button, Dimensions, ScrollView, StyleSheet, View } from 'react-native';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -11,8 +13,8 @@ export default function HomeScreen() {
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');
-    await AsyncStorage.removeItem('userName'); // Eliminar el nombre del usuario al cerrar sesión
-    router.replace('/login'); // Vuelve a la pantalla de login
+    await AsyncStorage.removeItem('userName');
+    router.replace('/login');
   };
 
   useEffect(() => {
@@ -21,64 +23,118 @@ export default function HomeScreen() {
       if (name) {
         setUserName(name);
       } else {
-        console.log('No se encontró el nombre del usuario en AsyncStorage'); // Ayuda a depurar
+        console.log('No se encontró el nombre del usuario en AsyncStorage');
       }
     };
     fetchUserName();
   }, []);
 
   return (
-    // Contenedor principal
     <ThemedView style={styles.container}>
-      <ThemedView style={styles.header}>
-        {/* Navbar */}
-        <ThemedView style={styles.navbar}>
-          <Link href="/admins"><ThemedText style={styles.linkText}>Admins</ThemedText></Link>
-          <Link href="/brands"><ThemedText style={styles.linkText}>Brands</ThemedText></Link>
-          <Link href="/categories"><ThemedText style={styles.linkText}>Categories</ThemedText></Link>
-          <Link href="/colors"><ThemedText style={styles.linkText}>Colors</ThemedText></Link>
-          <Link href="/coupons"><ThemedText style={styles.linkText}>Coupons</ThemedText></Link>
-          <Link href="/orders"><ThemedText style={styles.linkText}>Orders</ThemedText></Link>
-          <Link href="/products"><ThemedText style={styles.linkText}>Products</ThemedText></Link>
-          <Link href="/reviews"><ThemedText style={styles.linkText}>Reviews</ThemedText></Link>
-          <Link href="/sizes"><ThemedText style={styles.linkText}>Sizes</ThemedText></Link>
-          <Link href="/users"><ThemedText style={styles.linkText}>Users</ThemedText></Link>
-        </ThemedView>
-      </ThemedView>
-      <ThemedText type="title">¡Bienvenido {userName}!</ThemedText>
+      {/* Sidebar */}
+      <View style={styles.sidebar}>
+        <View style={styles.logoDetails}>
+          <ThemedText style={styles.logoText}>🛒 MyStore</ThemedText>
+        </View>
+        <ScrollView style={styles.navLinks}>
+          <Link href="/admins" style={styles.linkContainer}>
+            <ThemedText style={styles.navLinkText}>Admins</ThemedText>
+          </Link>
+          <Link href="/brands" style={styles.linkContainer}>
+            <ThemedText style={styles.navLinkText}>Brands</ThemedText>
+          </Link>
+          <Link href="/categories" style={styles.linkContainer}>
+            <ThemedText style={styles.navLinkText}>Categories</ThemedText>
+          </Link>
+          <Link href="/colors" style={styles.linkContainer}>
+            <ThemedText style={styles.navLinkText}>Colors</ThemedText>
+          </Link>
+          <Link href="/coupons" style={styles.linkContainer}>
+            <ThemedText style={styles.navLinkText}>Coupons</ThemedText>
+          </Link>
+          <Link href="/orders" style={styles.linkContainer}>
+            <ThemedText style={styles.navLinkText}>Orders</ThemedText>
+          </Link>
+          <Link href="/products" style={styles.linkContainer}>
+            <ThemedText style={styles.navLinkText}>Products</ThemedText>
+          </Link>
+          <Link href="/reviews" style={styles.linkContainer}>
+            <ThemedText style={styles.navLinkText}>Reviews</ThemedText>
+          </Link>
+          <Link href="/sizes" style={styles.linkContainer}>
+            <ThemedText style={styles.navLinkText}>Sizes</ThemedText>
+          </Link>
+          <Link href="/users" style={styles.linkContainer}>
+            <ThemedText style={styles.navLinkText}>Users</ThemedText>
+          </Link>
+        </ScrollView>
+      </View>
 
-      {/* Botón de logout */}
-      <ThemedView style={{ marginVertical: 20 }}>
-        <Button title="Cerrar sesión" onPress={handleLogout} />
-      </ThemedView>
+      {/* Main Content */}
+      <View style={styles.homeSection}>
+        <ThemedText style={styles.welcomeText}>¡Bienvenido {userName}!</ThemedText>
+        <View style={{ marginVertical: 20 }}>
+          <Button title="Cerrar sesión" onPress={handleLogout} />
+        </View>
+      </View>
     </ThemedView>
   );
 }
 
+const SIDEBAR_WIDTH = 180;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    flexDirection: 'row', // Sidebar + contenido lado a lado
+    backgroundColor: '#f5f5f5',
+  },
+  sidebar: {
+    width: SIDEBAR_WIDTH,
+    height: SCREEN_HEIGHT,
+    backgroundColor: '#11101d',
+    paddingTop: 20,
+  },
+  logoDetails: {
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  logoText: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '600',
+  },
+  navLinks: {
+    paddingLeft: 10,
+  },
+  linkContainer: {
+    backgroundColor: '#1d1b31',
+    marginVertical: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    // Sombra para iOS
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    // Elevación para Android
+    elevation: 5,
+  },
+  navLinkText: {
+    color: '#fff',
+    fontSize: 18,
+  },
+  homeSection: {
+    flex: 1,
     padding: 20,
   },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'dark',
-    zIndex: 1000,
-    paddingVertical: 10,
-  },
-  navbar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-  },
-  linkText: {
-    padding: 10,
-    fontSize: 16,
-    color: '#007bff',
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: '500',
+    color: '#11101d',
+    marginBottom: 20,
   },
 });

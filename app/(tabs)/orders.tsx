@@ -1,18 +1,22 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  SafeAreaView,
-  StyleSheet,
-  Alert,
   ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
 
-const API_URL = 'http://localhost:8000/api/admin/orders';
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 type Order = {
   id: number;
@@ -23,10 +27,31 @@ type Order = {
   created_at: string;
 };
 
+const API_URL = 'http://localhost:8000/api/admin/orders';
+
 export default function OrdersPage() {
-  const navigation = useNavigation();
+  const { width } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
+  const isMobile = !isWeb;
+
+  // En web sidebar un poco más angosto, en móvil el ancho fijo 180
+  const SIDEBAR_WIDTH = isWeb ? 140 : 180;
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const routes = [
+    { path: '/admins', label: 'Admins' },
+    { path: '/brands', label: 'Brands' },
+    { path: '/categories', label: 'Categories' },
+    { path: '/colors', label: 'Colors' },
+    { path: '/coupons', label: 'Coupons' },
+    { path: '/orders', label: 'Orders' },
+    { path: '/products', label: 'Products' },
+    { path: '/reviews', label: 'Reviews' },
+    { path: '/sizes', label: 'Sizes' },
+    { path: '/users', label: 'Users' },
+  ] as const;
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -76,76 +101,146 @@ export default function OrdersPage() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Botón de regresar */}
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Text style={styles.backButtonText}>← Volver</Text>
-      </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={[styles.container]}>
+        {/* Sidebar */}
+        <View style={[styles.sidebar, { width: SIDEBAR_WIDTH }]}>
+          <View style={styles.logoDetails}>
+            <Text style={styles.logoText}>🛒 MyStore</Text>
+          </View>
+          <ScrollView style={styles.navLinks}>
+            {routes.map((route) => (
+              <Link
+                href={route.path}
+                key={route.path}
+                style={styles.linkContainer}
+                asChild
+              >
+                <TouchableOpacity>
+                  <Text style={styles.navLinkText}>{route.label}</Text>
+                </TouchableOpacity>
+              </Link>
+            ))}
+          </ScrollView>
+        </View>
 
-      <Text style={styles.title}>Pedidos</Text>
+        {/* Main content */}
+        <View style={styles.homeSection}>
+          <Text style={styles.welcomeText}>📦 Pedidos</Text>
 
-      {loading ? (
-        <ActivityIndicator size="large" />
-      ) : (
-        <FlatList
-          data={orders}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <Text style={styles.bold}>ID: {item.id}</Text>
-              <Text>Usuario: {item.user?.name}</Text>
-              <Text>Total: ${item.total}</Text>
-              <Text>Cantidad: {item.qty}</Text>
-              <Text>Entregado: {item.delivered_at ? 'Sí' : 'No'}</Text>
-              <View style={styles.actions}>
-                {!item.delivered_at && (
-                  <TouchableOpacity
-                    style={[styles.button, { backgroundColor: 'blue' }]}
-                    onPress={() => markAsDelivered(item.id)}
-                  >
-                    <Text style={styles.buttonText}>Marcar Entregado</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
+          {loading ? (
+            <ActivityIndicator size="large" color="#4e8cff" />
+          ) : (
+            <FlatList
+              data={orders}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              renderItem={({ item }) => (
+                <View style={[styles.card, { backgroundColor: '#fff' }]}>
+                  <Text style={[
+                    styles.bold,
+                    isMobile ? { marginLeft: 20 } : {},
+                  ]}>
+                    ID: {item.id}
+                  </Text>
+                  <Text>Usuario: {item.user?.name}</Text>
+                  <Text>Total: ${item.total}</Text>
+                  <Text>Cantidad: {item.qty}</Text>
+                  <Text>Entregado: {item.delivered_at ? 'Sí' : 'No'}</Text>
+                  <View style={styles.actions}>
+                    {!item.delivered_at && (
+                      <TouchableOpacity
+                        style={[styles.button, { backgroundColor: '#4e8cff' }]}
+                        onPress={() => markAsDelivered(item.id)}
+                      >
+                        <Text style={styles.buttonText}>Marcar Entregado</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              )}
+            />
           )}
-        />
-      )}
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f5f5f5' },
+
   container: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#f5f5f5',
+  },
+  sidebar: {
+    height: SCREEN_HEIGHT,
+    backgroundColor: '#11101d',
+    paddingTop: 20,
+  },
+  logoDetails: {
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  logoText: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '600',
+  },
+  navLinks: {
+    paddingLeft: 10,
+  },
+  linkContainer: {
+    backgroundColor: '#1d1b31',
+    marginVertical: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  navLinkText: {
+    color: '#fff',
+    fontSize: 18,
+  },
+  homeSection: {
     flex: 1,
     padding: 20,
   },
-  backButton: {
-    marginBottom: 10,
-    alignSelf: 'flex-start',
-  },
-  backButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: '500',
+    color: '#11101d',
     marginBottom: 20,
   },
-  item: {
-    backgroundColor: '#f5f5f5',
+
+  card: {
     padding: 15,
-    marginBottom: 15,
-    borderRadius: 8,
+    borderRadius: 10,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
+
   bold: {
     fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 8,
   },
   actions: {
     flexDirection: 'row',
     marginTop: 10,
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-end',
   },
   button: {
     padding: 10,

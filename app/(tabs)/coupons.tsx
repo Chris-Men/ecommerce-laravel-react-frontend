@@ -1,21 +1,25 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Button,
+  Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  Alert,
-  Modal,
-  StyleSheet,
-  ActivityIndicator,
-  SafeAreaView,
-  Button,
+  useWindowDimensions,
+  View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
 
-const API_URL = 'http://localhost:8000/api/admin/coupons';
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 type Coupon = {
   id: number;
@@ -24,19 +28,39 @@ type Coupon = {
   valid_until?: string;
 };
 
+const API_URL = 'http://localhost:8000/api/admin/coupons';
+
 export default function CouponsPage() {
-  const navigation = useNavigation();
+  const { width } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
+  const isMobile = !isWeb;
+
+  // En web sidebar un poco más angosto, en móvil el ancho fijo 180
+  const SIDEBAR_WIDTH = isWeb ? 140 : 180;
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
-  const [couponToDelete, setCouponToDelete] = useState<number | null>(null);
-
   const [name, setName] = useState('');
   const [discount, setDiscount] = useState('');
   const [validUntil, setValidUntil] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [couponToDelete, setCouponToDelete] = useState<number | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const routes = [
+    { path: '/admins', label: 'Admins' },
+    { path: '/brands', label: 'Brands' },
+    { path: '/categories', label: 'Categories' },
+    { path: '/colors', label: 'Colors' },
+    { path: '/coupons', label: 'Coupons' },
+    { path: '/orders', label: 'Orders' },
+    { path: '/products', label: 'Products' },
+    { path: '/reviews', label: 'Reviews' },
+    { path: '/sizes', label: 'Sizes' },
+    { path: '/users', label: 'Users' },
+  ] as const;
 
   const fetchCoupons = async () => {
     setLoading(true);
@@ -48,21 +72,27 @@ export default function CouponsPage() {
           Accept: 'application/json',
         },
       });
-      const json = await res.json();
-      setCoupons(json.coupons);
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || 'Error al obtener cupones');
+
+      const sortedCoupons = data.coupons.sort((a: Coupon, b: Coupon) => a.id - b.id);
+      setCoupons(sortedCoupons);
     } catch (error: any) {
-      console.error('Error al obtener cupones:', error.message);
-      Alert.alert('Error', 'No se pudieron cargar los cupones');
+      Alert.alert('Error', error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const showSuccessMessage = (msg: string) => {
+    setSuccessMessage(msg);
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
   const handleSubmit = async () => {
-    if (!name || !discount) {
-      Alert.alert('Validación', 'Todos los campos son obligatorios.');
-      return;
-    }
+    if (!name || !discount) return Alert.alert('Validación', 'Todos los campos son obligatorios.');
 
     const token = await AsyncStorage.getItem('token');
     const method = editingId ? 'PUT' : 'POST';
@@ -86,28 +116,19 @@ export default function CouponsPage() {
       const data = await res.json();
 
       if (res.ok) {
-        Alert.alert(data.message || 'Cupón guardado con éxito');
+        showSuccessMessage(editingId ? 'Cupón actualizado con éxito' : 'Cupón agregado con éxito');
         resetForm();
         fetchCoupons();
       } else {
-        Alert.alert('Error', data.message || 'Error al guardar el cupón');
+        Alert.alert('Error', data.message || 'Error al guardar');
       }
-    } catch (error: any) {
-      console.error('Error:', error.message);
+    } catch {
       Alert.alert('Error', 'No se pudo guardar el cupón');
     }
   };
 
-  const handleEdit = (coupon: Coupon) => {
-    setName(coupon.name);
-    setDiscount(coupon.discount.toString());
-    setValidUntil(coupon.valid_until || '');
-    setEditingId(coupon.id);
-    setModalVisible(true);
-  };
-
   const handleDelete = async () => {
-    if (couponToDelete === null) return;
+    if (!couponToDelete) return;
 
     const token = await AsyncStorage.getItem('token');
 
@@ -121,20 +142,24 @@ export default function CouponsPage() {
       });
 
       const data = await res.json();
-
       if (res.ok) {
-        Alert.alert(data.message || 'Cupón eliminado');
+        showSuccessMessage('Cupón eliminado con éxito');
         fetchCoupons();
       } else {
-        Alert.alert('Error', data.message || 'Error al eliminar el cupón');
+        Alert.alert('Error', data.message || 'Error al eliminar');
       }
-    } catch (error: any) {
-      console.error('Error:', error.message);
-      Alert.alert('Error', 'No se pudo eliminar el cupón');
     } finally {
       setConfirmDeleteVisible(false);
       setCouponToDelete(null);
     }
+  };
+
+  const handleEdit = (coupon: Coupon) => {
+    setName(coupon.name);
+    setDiscount(coupon.discount.toString());
+    setValidUntil(coupon.valid_until || '');
+    setEditingId(coupon.id);
+    setModalVisible(true);
   };
 
   const resetForm = () => {
@@ -150,196 +175,280 @@ export default function CouponsPage() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Botón Volver */}
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Text style={styles.backButtonText}>← Volver</Text>
-      </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={[styles.container]}>
+        {/* Sidebar */}
+        <View style={[styles.sidebar, { width: SIDEBAR_WIDTH }]}>
+          <View style={styles.logoDetails}>
+            <Text style={styles.logoText}>🛒 MyStore</Text>
+          </View>
+          <ScrollView style={styles.navLinks}>
+            {routes.map((route) => (
+              <Link
+                href={route.path}
+                key={route.path}
+                style={styles.linkContainer}
+                asChild
+              >
+                <TouchableOpacity>
+                  <Text style={styles.navLinkText}>{route.label}</Text>
+                </TouchableOpacity>
+              </Link>
+            ))}
+          </ScrollView>
+        </View>
 
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => {
-          resetForm();
-          setModalVisible(true);
-        }}
-      >
-        <Text style={styles.addButtonText}>+ Agregar Cupón</Text>
-      </TouchableOpacity>
+        {/* Main content */}
+        <View style={styles.homeSection}>
+          <Text style={styles.welcomeText}>🎟️ Cupones</Text>
 
-      <Text style={styles.title}>Listado de Cupones</Text>
+          {successMessage && (
+            <View style={styles.successMessageContainer}>
+              <Text style={styles.successMessageText}>{successMessage}</Text>
+            </View>
+          )}
 
-      {loading ? (
-        <ActivityIndicator size="large" />
-      ) : (
-        <FlatList
-          data={coupons}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => {
-            const isExpired =
-              item.valid_until && new Date(item.valid_until) < new Date();
+          <TouchableOpacity
+            style={[styles.linkContainer, { backgroundColor: '#4e8cff', marginBottom: 15, paddingVertical: 12 }]}
+            onPress={() => {
+              resetForm();
+              setModalVisible(true);
+            }}
+          >
+            <Text style={{ color: 'white', fontWeight: '600', fontSize: 16 }}>+ Nuevo Cupón</Text>
+          </TouchableOpacity>
 
-            return (
-              <View style={styles.card}>
-                <Text style={styles.bold}>Nombre: {item.name}</Text>
-                <Text>Descuento: {item.discount}</Text>
-                <Text>
-                  Expira:{' '}
-                  {item.valid_until
-                    ? `${item.valid_until} (${isExpired ? 'Expirado' : 'Vigente'})`
-                    : 'Sin fecha'}
-                </Text>
-                <View style={styles.actions}>
-                  <TouchableOpacity onPress={() => handleEdit(item)}>
-                    <Text style={{ color: 'blue', marginRight: 10 }}>Editar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setCouponToDelete(item.id);
-                      setConfirmDeleteVisible(true);
-                    }}
-                  >
-                    <Text style={{ color: 'red' }}>Eliminar</Text>
-                  </TouchableOpacity>
+          {loading ? (
+            <ActivityIndicator size="large" color="#4e8cff" />
+          ) : (
+            <FlatList
+              data={coupons}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              renderItem={({ item }) => {
+                const isExpired = item.valid_until && new Date(item.valid_until) < new Date();
+
+                return (
+                  <View style={[styles.card, { backgroundColor: '#fff' }]}>
+                    <Text
+                      style={[
+                        { fontSize: 16, fontWeight: '500', marginBottom: 8 },
+                        isMobile ? { marginLeft: 20 } : {},
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text style={{ marginBottom: 4 }}>Descuento: {item.discount}</Text>
+                    <Text style={{ marginBottom: 8 }}>
+                      Expira:{' '}
+                      {item.valid_until
+                        ? `${item.valid_until} (${isExpired ? 'Expirado' : 'Vigente'})`
+                        : 'Sin fecha'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                      <TouchableOpacity onPress={() => handleEdit(item)} style={{ marginRight: 15 }}>
+                        <Text style={{ color: '#4e8cff' }}>Editar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setCouponToDelete(item.id);
+                          setConfirmDeleteVisible(true);
+                        }}
+                      >
+                        <Text style={{ color: '#ff4e4e' }}>Eliminar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              }}
+            />
+          )}
+
+          {/* Modal agregar/editar */}
+          <Modal animationType="fade" transparent visible={modalVisible}>
+            <View style={styles.modalOverlay}>
+              <View
+                style={[
+                  styles.modalContainer,
+                  isWeb
+                    ? { width: 300 } // mismo ancho que modal eliminar en web
+                    : { width: '85%' }, // ancho móvil
+                ]}
+              >
+                <Text style={styles.modalTitle}>{editingId ? 'Editar Cupón' : 'Agregar Cupón'}</Text>
+                <TextInput
+                  placeholder="Nombre del cupón"
+                  value={name}
+                  onChangeText={setName}
+                  style={styles.input}
+                  placeholderTextColor="#888"
+                />
+                <TextInput
+                  placeholder="Descuento"
+                  keyboardType="numeric"
+                  value={discount}
+                  onChangeText={setDiscount}
+                  style={styles.input}
+                  placeholderTextColor="#888"
+                />
+                <TextInput
+                  placeholder="Fecha de expiración (opcional)"
+                  value={validUntil}
+                  onChangeText={setValidUntil}
+                  style={styles.input}
+                  placeholderTextColor="#888"
+                />
+                <View style={styles.modalButtons}>
+                  <Button title={editingId ? 'Actualizar' : 'Guardar'} onPress={handleSubmit} />
+                  <Button
+                    title="Cancelar"
+                    color="gray"
+                    onPress={resetForm}
+                  />
                 </View>
               </View>
-            );
-          }}
-        />
-      )}
-
-      {/* Modal agregar/editar */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={resetForm}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>
-              {editingId ? 'Editar Cupón' : 'Agregar Cupón'}
-            </Text>
-
-            <TextInput
-              placeholder="Nombre"
-              value={name}
-              onChangeText={setName}
-              style={styles.input}
-            />
-            <TextInput
-              placeholder="Descuento"
-              keyboardType="numeric"
-              value={discount}
-              onChangeText={setDiscount}
-              style={styles.input}
-            />
-            <TextInput
-              placeholder="Fecha de expiración (opcional)"
-              value={validUntil}
-              onChangeText={setValidUntil}
-              style={styles.input}
-            />
-
-            <View style={styles.modalButtons}>
-              <Button title={editingId ? 'Actualizar' : 'Guardar'} onPress={handleSubmit} />
-              <Button title="Cancelar" color="gray" onPress={resetForm} />
             </View>
-          </View>
-        </View>
-      </Modal>
+          </Modal>
 
-      {/* Modal eliminar */}
-      <Modal
-        visible={confirmDeleteVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setConfirmDeleteVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>¿Eliminar cupón?</Text>
-            <Text>¿Estás seguro de que deseas eliminar este cupón?</Text>
-            <View style={styles.modalButtons}>
-              <Button title="Eliminar" onPress={handleDelete} color="red" />
-              <Button title="Cancelar" onPress={() => setConfirmDeleteVisible(false)} />
+          {/* Modal confirmación eliminar */}
+          <Modal animationType="fade" transparent visible={confirmDeleteVisible}>
+            <View style={styles.modalOverlay}>
+              <View
+                style={[
+                  styles.modalContainer,
+                  isWeb
+                    ? { width: 300 }
+                    : { width: '85%' },
+                ]}
+              >
+                <Text style={styles.modalTitle}>¿Eliminar cupón?</Text>
+                <Text style={{ marginBottom: 15 }}>
+                  ¿Estás seguro de que deseas eliminar este cupón?
+                </Text>
+                <View style={styles.modalButtons}>
+                  <Button title="Eliminar" onPress={handleDelete} color="red" />
+                  <Button
+                    title="Cancelar"
+                    onPress={() => {
+                      setConfirmDeleteVisible(false);
+                      setCouponToDelete(null);
+                    }}
+                  />
+                </View>
+              </View>
             </View>
-          </View>
+          </Modal>
         </View>
-      </Modal>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f5f5f5' },
+
   container: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#f5f5f5',
+  },
+  sidebar: {
+    height: SCREEN_HEIGHT,
+    backgroundColor: '#11101d',
+    paddingTop: 20,
+  },
+  logoDetails: {
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  logoText: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '600',
+  },
+  navLinks: {
+    paddingLeft: 10,
+  },
+  linkContainer: {
+    backgroundColor: '#1d1b31',
+    marginVertical: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  navLinkText: {
+    color: '#fff',
+    fontSize: 18,
+  },
+  homeSection: {
     flex: 1,
     padding: 20,
   },
-  backButton: {
-    marginBottom: 10,
-    alignSelf: 'flex-start',
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: '500',
+    color: '#11101d',
+    marginBottom: 20,
   },
-  backButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginVertical: 20,
-  },
-  addButton: {
-    backgroundColor: '#28a745',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 5,
-    alignSelf: 'flex-start',
-  },
-  addButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
+
   card: {
-    backgroundColor: '#f0f0f0',
     padding: 15,
     borderRadius: 10,
-    marginBottom: 15,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  bold: {
-    fontWeight: 'bold',
-  },
-  actions: {
-    flexDirection: 'row',
-    marginTop: 10,
-  },
+
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: '#000000aa',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
-    width: '85%',
     backgroundColor: 'white',
+    borderRadius: 15,
     padding: 20,
-    borderRadius: 10,
+    // ancho y padding ajustados para web/mobile con inline styles en componente
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '600',
     marginBottom: 15,
-    textAlign: 'center',
   },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
-    marginBottom: 10,
-    padding: 10,
-    borderRadius: 5,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 15,
+    fontSize: 16,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 10,
+  },
+
+  successMessageContainer: {
+    backgroundColor: '#4caf50',
+    paddingVertical: 10,
+    marginBottom: 15,
+    borderRadius: 10,
+  },
+  successMessageText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: '600',
   },
 });
