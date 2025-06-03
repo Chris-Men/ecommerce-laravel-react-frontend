@@ -27,6 +27,7 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const isWeb = Platform.OS === 'web';
 const SIDEBAR_WIDTH = isWeb ? 140 : 180;
+const PRODUCTS_PER_PAGE = 12;
 
 // Calcular el número de columnas basado en el ancho de pantalla
 const getNumColumns = () => {
@@ -88,11 +89,17 @@ function AdminSidebar() {
 
 export default function AdminProductsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
   const [productToDelete, setProductToDelete] = useState<number | null>(null);
+  
+  // Estados para búsqueda y paginación
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [toggleLoading, setToggleLoading] = useState<number | null>(null);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -114,6 +121,22 @@ export default function AdminProductsScreen() {
     fetchOptions();
   }, []);
 
+  // Efecto para filtrar productos cuando cambia la búsqueda
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredProducts(products);
+    } else {
+      const filtered = products.filter(product =>
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.category?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.brand?.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredProducts(filtered);
+    }
+    setCurrentPage(1); // Reset página cuando se busca
+  }, [searchQuery, products]);
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -125,7 +148,9 @@ export default function AdminProductsScreen() {
         },
       });
       const data = await response.json();
-      setProducts(Array.isArray(data.data) ? data.data : []);
+      const productsData = Array.isArray(data.data) ? data.data : [];
+      setProducts(productsData);
+      setFilteredProducts(productsData);
     } catch {
       Alert.alert('Error', 'No se pudo cargar la lista de productos.');
     } finally {
@@ -152,6 +177,52 @@ export default function AdminProductsScreen() {
     fetchEntity('brands', setBrands);
     fetchEntity('sizes', setSizes);
     fetchEntity('colors', setColors);
+  };
+
+  // Función corregida para cambiar disponibilidad
+  const handleToggleAvailability = async (productId: number) => {
+    setToggleLoading(productId);
+    
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('Error', 'Token de autenticación no encontrado');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/admin/products/${productId}/toggle-availability`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Actualizar ambos estados locales correctamente
+        const updateProductStatus = (prevProducts: Product[]) =>
+          prevProducts.map(product =>
+            product.id === productId
+              ? { ...product, status: !product.status }
+              : product
+          );
+
+        setProducts(updateProductStatus);
+        setFilteredProducts(updateProductStatus);
+        
+        Alert.alert('Éxito', 'Estado del producto actualizado correctamente');
+      } else {
+        Alert.alert('Error', data.message || 'Error al actualizar el estado del producto');
+      }
+    } catch (error: any) {
+      console.error('Toggle availability error:', error);
+      Alert.alert('Error', `No se pudo actualizar el estado: ${error.message}`);
+    } finally {
+      setToggleLoading(null);
+    }
   };
 
   const resetForm = () => {
@@ -294,6 +365,15 @@ export default function AdminProductsScreen() {
     }
   };
 
+  // Calcular productos para mostrar según paginación
+  const getPaginatedProducts = () => {
+    const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    const endIndex = startIndex + PRODUCTS_PER_PAGE;
+    return filteredProducts.slice(startIndex, endIndex);
+  };
+
+  const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
+
   const renderProductItem = ({ item, index }: { item: Product; index: number }) => (
     <View style={[
       styles.card,
@@ -341,6 +421,22 @@ export default function AdminProductsScreen() {
         </TouchableOpacity>
         
         <TouchableOpacity 
+          style={[
+            styles.actionButton, 
+            item.status ? styles.deactivateButton : styles.activateButton
+          ]} 
+          onPress={() => handleToggleAvailability(item.id)}
+          disabled={toggleLoading === item.id}
+        >
+          <Text style={styles.buttonText}>
+            {toggleLoading === item.id 
+              ? '⏳' 
+              : item.status ? '🔒 Desactivar' : '✅ Activar'
+            }
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
           style={[styles.actionButton, styles.deleteButton]} 
           onPress={() => {
             setProductToDelete(item.id);
@@ -352,6 +448,77 @@ export default function AdminProductsScreen() {
       </View>
     </View>
   );
+
+  // Componente de Paginación
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const getVisiblePages = () => {
+      let start = Math.max(1, currentPage - 2);
+      let end = Math.min(totalPages, start + 4);
+      start = Math.max(1, end - 4);
+      
+      const pages = [];
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      return pages;
+    };
+
+    return (
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity 
+          style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+          onPress={() => setCurrentPage(1)}
+          disabled={currentPage === 1}
+        >
+          <Text style={styles.paginationButtonText}>««</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+          onPress={() => setCurrentPage(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          <Text style={styles.paginationButtonText}>‹</Text>
+        </TouchableOpacity>
+
+        {getVisiblePages().map(page => (
+          <TouchableOpacity 
+            key={page}
+            style={[
+              styles.paginationButton, 
+              currentPage === page && styles.paginationButtonActive
+            ]}
+            onPress={() => setCurrentPage(page)}
+          >
+            <Text style={[
+              styles.paginationButtonText,
+              currentPage === page && styles.paginationButtonTextActive
+            ]}>
+              {page}
+            </Text>
+          </TouchableOpacity>
+        ))}
+
+        <TouchableOpacity 
+          style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+          onPress={() => setCurrentPage(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          <Text style={styles.paginationButtonText}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+          onPress={() => setCurrentPage(totalPages)}
+          disabled={currentPage === totalPages}
+        >
+          <Text style={styles.paginationButtonText}>»»</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -370,21 +537,63 @@ export default function AdminProductsScreen() {
       <AdminSidebar />
       <View style={styles.contentContainer}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Gestión de Productos ({products.length})</Text>
+          <Text style={styles.headerTitle}>
+            Gestión de Productos ({filteredProducts.length}
+            {searchQuery ? ` de ${products.length}` : ''})
+          </Text>
           <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
             <Text style={styles.addButtonText}>+ Agregar Producto</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Barra de búsqueda */}
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="🔍 Buscar productos por nombre, descripción, categoría o marca..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity 
+              style={styles.clearSearchButton}
+              onPress={() => setSearchQuery('')}
+            >
+              <Text style={styles.clearSearchText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Información de paginación */}
+        {filteredProducts.length > 0 && (
+          <View style={styles.paginationInfo}>
+            <Text style={styles.paginationInfoText}>
+              Mostrando {Math.min((currentPage - 1) * PRODUCTS_PER_PAGE + 1, filteredProducts.length)} - {Math.min(currentPage * PRODUCTS_PER_PAGE, filteredProducts.length)} de {filteredProducts.length} productos
+            </Text>
+          </View>
+        )}
         
-        <FlatList
-          data={products}
-          numColumns={NUM_COLUMNS}
-          key={NUM_COLUMNS}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderProductItem}
-          contentContainerStyle={styles.gridContainer}
-          showsVerticalScrollIndicator={false}
-        />
+        {filteredProducts.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              {searchQuery ? 'No se encontraron productos que coincidan con tu búsqueda' : 'No hay productos disponibles'}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <FlatList
+              data={getPaginatedProducts()}
+              numColumns={NUM_COLUMNS}
+              key={`${NUM_COLUMNS}-${currentPage}`}
+              keyExtractor={(item) => `${item.id}-${currentPage}`}
+              renderItem={renderProductItem}
+              contentContainerStyle={styles.gridContainer}
+              showsVerticalScrollIndicator={false}
+            />
+            
+            {renderPagination()}
+          </>
+        )}
 
         <Modal
           visible={modalVisible}
@@ -485,48 +694,46 @@ export default function AdminProductsScreen() {
         </Modal>
 
         {/* Modal de confirmación para eliminar */}
-      {/* Modal de confirmación para eliminar */}
-<Modal
-  visible={confirmDeleteVisible}
-  animationType="fade"
-  transparent={true}
-  onRequestClose={() => {
-    setConfirmDeleteVisible(false);
-    setProductToDelete(null);
-  }}
->
-  <View style={styles.modalOverlay}>
-    <View style={[styles.modalContainer, { width: isWeb ? 300 : '85%' }]}>
-      <Text style={styles.modalTitle}>¿Eliminar producto?</Text>
-      <Text style={styles.modalText}>
-        Esta acción no se puede deshacer. ¿Estás seguro?
-      </Text>
+        <Modal
+          visible={confirmDeleteVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => {
+            setConfirmDeleteVisible(false);
+            setProductToDelete(null);
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContainer, { width: isWeb ? 300 : '85%' }]}>
+              <Text style={styles.modalTitle}>¿Eliminar producto?</Text>
+              <Text style={styles.modalText}>
+                Esta acción no se puede deshacer. ¿Estás seguro?
+              </Text>
 
-      <View style={styles.modalButtons}>
-  <TouchableOpacity
-    style={styles.deleteConfirmButton}
-    onPress={handleDelete}
-    disabled={loading}
-  >
-    <Text style={styles.deleteConfirmButtonText}>
-      {loading ? 'Eliminando...' : 'Eliminar'}
-    </Text>
-  </TouchableOpacity>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.deleteConfirmButton}
+                  onPress={handleDelete}
+                  disabled={loading}
+                >
+                  <Text style={styles.deleteConfirmButtonText}>
+                    {loading ? 'Eliminando...' : 'Eliminar'}
+                  </Text>
+                </TouchableOpacity>
 
-  <TouchableOpacity
-    style={styles.cancelButton}
-    onPress={() => {
-      setConfirmDeleteVisible(false);
-      setProductToDelete(null);
-    }}
-  >
-    <Text style={styles.cancelButtonText}>Cancelar</Text>
-  </TouchableOpacity>
-</View>
-
-    </View>
-  </View>
-</Modal>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => {
+                    setConfirmDeleteVisible(false);
+                    setProductToDelete(null);
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
       </View>
     </SafeAreaView>
@@ -881,4 +1088,104 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
   },
+
+  // Estilos para búsqueda
+searchContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 20,
+  backgroundColor: '#fff',
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#dee2e6',
+  paddingHorizontal: 15,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3,
+},
+searchInput: {
+  flex: 1,
+  paddingVertical: Platform.OS === 'web' ? 12 : 10,
+  fontSize: 16,
+  color: '#495057',
+},
+clearSearchButton: {
+  padding: 8,
+  marginLeft: 8,
+},
+clearSearchText: {
+  fontSize: 18,
+  color: '#6c757d',
+  fontWeight: 'bold',
+},
+
+// Estilos para paginación
+paginationContainer: {
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginTop: 20,
+  marginBottom: 10,
+  gap: 8,
+},
+paginationButton: {
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 6,
+  backgroundColor: '#fff',
+  borderWidth: 1,
+  borderColor: '#dee2e6',
+  minWidth: 40,
+  alignItems: 'center',
+},
+paginationButtonActive: {
+  backgroundColor: '#007AFF',
+  borderColor: '#007AFF',
+},
+paginationButtonDisabled: {
+  backgroundColor: '#f8f9fa',
+  borderColor: '#e9ecef',
+},
+paginationButtonText: {
+  fontSize: 14,
+  color: '#495057',
+  fontWeight: '500',
+},
+paginationButtonTextActive: {
+  color: '#fff',
+  fontWeight: '600',
+},
+paginationInfo: {
+  alignItems: 'center',
+  marginBottom: 15,
+},
+paginationInfoText: {
+  fontSize: 14,
+  color: '#6c757d',
+  fontStyle: 'italic',
+},
+
+// Estilos para botones de activar/desactivar
+activateButton: {
+  backgroundColor: '#28a745',
+},
+deactivateButton: {
+  backgroundColor: '#ffc107',
+},
+
+// Estilos para estado vacío
+emptyContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingVertical: 60,
+},
+emptyText: {
+  fontSize: 16,
+  color: '#6c757d',
+  textAlign: 'center',
+  fontStyle: 'italic',
+}
 });
