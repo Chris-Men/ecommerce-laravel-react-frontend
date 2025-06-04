@@ -29,12 +29,15 @@ interface Category {
   image: string | null;
 }
 
+const CATEGORIES_PER_PAGE = 9;
+
 export default function CategoriesPage() {
   const isWeb = Platform.OS === 'web';
   const isMobile = Platform.OS === 'ios' || Platform.OS === 'android';
   const SIDEBAR_WIDTH = isWeb ? 200 : 180;
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
   const [image, setImage] = useState<any>(null);
@@ -43,6 +46,11 @@ export default function CategoriesPage() {
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<number | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Estados para paginación y búsqueda
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const totalPages = Math.ceil(filteredCategories.length / CATEGORIES_PER_PAGE);
 
   const routes = [
     { path: '/admins', label: 'Admins' },
@@ -67,7 +75,7 @@ export default function CategoriesPage() {
       }
 
       console.log('Fetching categories from:', API_URL);
-      
+
       const response = await fetch(API_URL, {
         method: 'GET',
         headers: {
@@ -78,7 +86,7 @@ export default function CategoriesPage() {
       });
 
       console.log('Response status:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Error response:', errorText);
@@ -87,7 +95,7 @@ export default function CategoriesPage() {
 
       const result = await response.json();
       console.log('Categories response:', result);
-      
+
       // Manejar diferentes estructuras de respuesta
       let categoriesData = [];
       if (result.data) {
@@ -100,13 +108,34 @@ export default function CategoriesPage() {
 
       const sortedCategories = categoriesData.sort((a: Category, b: Category) => a.id - b.id);
       setCategories(sortedCategories);
-      
+      setFilteredCategories(sortedCategories); // Actualizar filteredCategories al cargar
+
     } catch (error: any) {
       console.error('Error fetching categories:', error);
       Alert.alert('Error', `No se pudieron cargar las categorías: ${error.message}`);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getPaginatedFilteredCategories = () => {
+    const startIndex = (currentPage - 1) * CATEGORIES_PER_PAGE;
+    return filteredCategories.slice(startIndex, startIndex + CATEGORIES_PER_PAGE);
+  };
+
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim() === '') {
+      setFilteredCategories(categories); // Si no hay búsqueda, mostrar todas
+    } else {
+      const filtered = categories.filter(category =>
+        category.name.toLowerCase().includes(query.toLowerCase()) ||
+        category.slug.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredCategories(filtered);
+    }
+    setCurrentPage(1); // Resetear a la primera página al buscar
   };
 
   const showSuccessMessage = (msg: string) => {
@@ -133,15 +162,15 @@ export default function CategoriesPage() {
       input.click();
     } else {
       launchImageLibrary(
-        { 
-          mediaType: 'photo', 
+        {
+          mediaType: 'photo',
           quality: 0.8,
           maxWidth: 800,
           maxHeight: 600
-        }, 
+        },
         (response) => {
           if (response.didCancel || response.errorMessage) return;
-          
+
           if (response.assets && response.assets.length > 0) {
             setImage(response.assets[0]);
           } else {
@@ -159,7 +188,7 @@ export default function CategoriesPage() {
     }
 
     setLoading(true);
-    
+
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
@@ -177,7 +206,7 @@ export default function CategoriesPage() {
         } else if (Platform.OS !== 'web' && image.uri) {
           const fileName = image.fileName || `image_${Date.now()}.jpg`;
           const fileType = image.type || 'image/jpeg';
-          
+
           formData.append('image', {
             uri: Platform.OS === 'android' ? image.uri : image.uri.replace('file://', ''),
             name: fileName,
@@ -271,7 +300,7 @@ export default function CategoriesPage() {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         showSuccessMessage('Categoría eliminada con éxito');
         await fetchCategories();
@@ -307,11 +336,11 @@ export default function CategoriesPage() {
           onError={(error) => console.log('Image load error:', error)}
         />
       )}
-      
+
       <View style={[styles.categoryContent, isMobile ? styles.categoryContentMobile : styles.categoryContentWeb]}>
         <Text style={styles.categoryName}>{item.name}</Text>
         <Text style={styles.categorySlug}>Slug: {item.slug}</Text>
-        
+
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={styles.editButton}
@@ -332,6 +361,36 @@ export default function CategoriesPage() {
       </View>
     </View>
   );
+
+  const renderPagination = () => {
+    return (
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+          onPress={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+        >
+          <Text style={styles.paginationButtonText}>‹ Anterior</Text>
+        </TouchableOpacity>
+        <Text style={styles.paginationInfoText}>{`${currentPage} de ${totalPages}`}</Text>
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+          onPress={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+        >
+          <Text style={styles.paginationButtonText}>Siguiente ›</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    setFilteredCategories(categories);
+  }, [categories]);
 
   // Forzar numColumns para ser exactamente 1 en móvil
   const numColumns = isMobile ? 1 : 3;
@@ -375,6 +434,24 @@ export default function CategoriesPage() {
             </TouchableOpacity>
           </View>
 
+          {/* Barra de búsqueda */}
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="🔍 Buscar categorías..."
+              value={searchQuery}
+              onChangeText={handleSearch}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearSearchButton}
+                onPress={() => handleSearch('')}
+              >
+                <Text style={styles.clearSearchText}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           {successMessage && (
             <View style={styles.successMessageContainer}>
               <Text style={styles.successMessageText}>{successMessage}</Text>
@@ -386,7 +463,7 @@ export default function CategoriesPage() {
               <ActivityIndicator size="large" color="#4e8cff" />
               <Text style={styles.loadingText}>Cargando...</Text>
             </View>
-          ) : categories.length === 0 ? (
+          ) : filteredCategories.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No hay categorías disponibles</Text>
               <TouchableOpacity
@@ -397,16 +474,19 @@ export default function CategoriesPage() {
               </TouchableOpacity>
             </View>
           ) : (
-            <FlatList
-              data={categories}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={renderCategoryItem}
-              numColumns={numColumns}
-              key={`${numColumns}-${isMobile ? 'mobile' : 'web'}`}
-              contentContainerStyle={styles.listContainer}
-              columnWrapperStyle={!isMobile ? styles.row : undefined}
-              showsVerticalScrollIndicator={true}
-            />
+            <>
+              <FlatList
+                data={getPaginatedFilteredCategories()}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderCategoryItem}
+                numColumns={numColumns}
+                key={`${numColumns}-${isMobile ? 'mobile' : 'web'}`}
+                contentContainerStyle={styles.listContainer}
+                columnWrapperStyle={!isMobile ? styles.row : undefined}
+                showsVerticalScrollIndicator={true}
+              />
+              {renderPagination()}
+            </>
           )}
 
           {/* Modal para agregar/editar */}
@@ -419,20 +499,20 @@ export default function CategoriesPage() {
                 <Text style={styles.modalTitle}>
                   {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
                 </Text>
-                
+
                 <TextInput
                   placeholder="Nombre de la categoría"
                   style={styles.input}
                   value={name}
                   onChangeText={setName}
                 />
-                
+
                 <TouchableOpacity onPress={openImagePicker} style={styles.imagePicker}>
                   <Text style={styles.imagePickerText}>
                     {image ? 'Cambiar Imagen' : 'Seleccionar Imagen'}
                   </Text>
                 </TouchableOpacity>
-                
+
                 {(image?.uri || editingCategory?.image) && (
                   <Image
                     source={{
@@ -441,10 +521,10 @@ export default function CategoriesPage() {
                     style={styles.previewImage}
                   />
                 )}
-                
+
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity 
-                    style={styles.saveButton} 
+                  <TouchableOpacity
+                    style={styles.saveButton}
                     onPress={handleSubmit}
                     disabled={loading}
                   >
@@ -478,8 +558,8 @@ export default function CategoriesPage() {
                   ¿Estás seguro de que deseas eliminar esta categoría?
                 </Text>
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity 
-                    style={styles.deleteConfirmButton} 
+                  <TouchableOpacity
+                    style={styles.deleteConfirmButton}
                     onPress={handleDelete}
                     disabled={loading}
                   >
@@ -532,7 +612,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Platform.OS === 'web' ? 30 : 20,
   },
-  
+
   // Sidebar
   sidebar: {
     height: SCREEN_HEIGHT,
@@ -585,7 +665,7 @@ const styles = StyleSheet.create({
     padding: Platform.OS === 'web' ? 30 : 20,
     backgroundColor: '#f8f9fa',
   },
-  
+
   // Header
   header: {
     flexDirection: 'row',
@@ -1043,5 +1123,61 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 16,
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 20,
+    gap: 10,
+  },
+  paginationButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#b0c4de', // Color para botón deshabilitado
+  },
+  paginationButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  paginationInfoText: {
+    fontSize: 16,
+    color: '#495057',
+    fontWeight: '500',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    paddingHorizontal: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: Platform.OS === 'web' ? 12 : 10,
+    fontSize: 16,
+    color: '#495057',
+  },
+  clearSearchButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  clearSearchText: {
+    fontSize: 18,
+    color: '#6c757d',
+    fontWeight: 'bold',
   },
 });
