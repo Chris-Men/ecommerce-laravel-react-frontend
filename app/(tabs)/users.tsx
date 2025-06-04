@@ -26,6 +26,13 @@ interface User {
   name: string;
   email: string;
   role: string;
+  city?: string;
+  zip_code?: string;
+  country?: string;
+  phone_number?: string;
+  profile_image?: string;
+  profile_completed: boolean;
+  image_path: string;
 }
 
 const API_URL = 'http://localhost:8000/api/admin/users';
@@ -40,7 +47,17 @@ export default function UserManagement() {
 
   const [users, setUsers] = useState<User[]>([]);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [form, setForm] = useState({ 
+    name: '', 
+    email: '', 
+    password: '',
+    city: '',
+    zip_code: '',
+    country: '',
+    phone_number: '',
+    profile_completed: false,
+    role: ''
+  });
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -95,13 +112,33 @@ export default function UserManagement() {
 
   const startEditing = (user: User) => {
     setEditingUser(user);
-    setForm({ name: user.name, email: user.email, password: '' });
+    setForm({ 
+      name: user.name, 
+      email: user.email, 
+      password: '',
+      city: user.city || '',
+      zip_code: user.zip_code || '',
+      country: user.country || '',
+      phone_number: user.phone_number || '',
+      profile_completed: user.profile_completed,
+      role: user.role
+    });
     setModalVisible(true);
   };
 
   const cancelEditing = () => {
     setEditingUser(null);
-    setForm({ name: '', email: '', password: '' });
+    setForm({ 
+      name: '', 
+      email: '', 
+      password: '',
+      city: '',
+      zip_code: '',
+      country: '',
+      phone_number: '',
+      profile_completed: false,
+      role: ''
+    });
     setModalVisible(false);
   };
 
@@ -115,6 +152,23 @@ export default function UserManagement() {
 
     try {
       const token = await getToken();
+      const requestBody: any = {
+        name: form.name,
+        email: form.email,
+        city: form.city,
+        zip_code: form.zip_code,
+        country: form.country,
+        phone_number: form.phone_number,
+        profile_completed: form.profile_completed,
+        role: form.role,
+      };
+
+      // Solo incluir password si se proporcionó
+      if (form.password) {
+        requestBody.password = form.password;
+        requestBody.password_confirmation = form.password;
+      }
+
       const response = await fetch(`${API_URL}/${editingUser.id}`, {
         method: 'PUT',
         headers: {
@@ -122,12 +176,7 @@ export default function UserManagement() {
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          password: form.password || undefined,
-          password_confirmation: form.password || undefined,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const result = await response.json();
@@ -228,6 +277,38 @@ export default function UserManagement() {
                     >
                       👤 {item.role.charAt(0).toUpperCase() + item.role.slice(1)}
                     </Text>
+                    {item.city && (
+                      <Text
+                        style={[
+                          { fontSize: 14, color: '#666', marginBottom: 2 },
+                          isMobile ? { marginLeft: 20 } : {},
+                        ]}
+                      >
+                        🏙️ {item.city}, {item.country}
+                      </Text>
+                    )}
+                    {item.phone_number && (
+                      <Text
+                        style={[
+                          { fontSize: 14, color: '#666', marginBottom: 2 },
+                          isMobile ? { marginLeft: 20 } : {},
+                        ]}
+                      >
+                        📱 {item.phone_number}
+                      </Text>
+                    )}
+                    <Text
+                      style={[
+                        { 
+                          fontSize: 12, 
+                          color: item.profile_completed ? '#28a745' : '#ffc107',
+                          fontWeight: '500'
+                        },
+                        isMobile ? { marginLeft: 20 } : {},
+                      ]}
+                    >
+                      ✅ Perfil: {item.profile_completed ? 'Completo' : 'Incompleto'}
+                    </Text>
                   </View>
                   <View style={{ justifyContent: 'center' }}>
                     <TouchableOpacity onPress={() => startEditing(item)}>
@@ -246,38 +327,103 @@ export default function UserManagement() {
                 style={[
                   styles.modalContainer,
                   isWeb
-                    ? { width: 350 } // un poco más ancho para los campos del usuario
-                    : { width: '90%' }, // ancho móvil
+                    ? { width: 400, maxHeight: '80%' } // más ancho y limitamos altura
+                    : { width: '95%', maxHeight: '90%' }, // ancho móvil
                 ]}
               >
-                <Text style={styles.modalTitle}>Editar Usuario</Text>
-                
-                <TextInput
-                  placeholder="Nombre"
-                  value={form.name}
-                  onChangeText={(text) => setForm({ ...form, name: text })}
-                  style={styles.input}
-                  placeholderTextColor="#888"
-                />
-                
-                <TextInput
-                  placeholder="Correo electrónico"
-                  value={form.email}
-                  onChangeText={(text) => setForm({ ...form, email: text })}
-                  style={styles.input}
-                  placeholderTextColor="#888"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-                
-                <TextInput
-                  placeholder="Nueva contraseña (opcional)"
-                  value={form.password}
-                  onChangeText={(text) => setForm({ ...form, password: text })}
-                  style={styles.input}
-                  placeholderTextColor="#888"
-                  secureTextEntry
-                />
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <Text style={styles.modalTitle}>Editar Usuario</Text>
+                  
+                  {/* Campos básicos */}
+                  <TextInput
+                    placeholder="Nombre"
+                    value={form.name}
+                    onChangeText={(text) => setForm({ ...form, name: text })}
+                    style={styles.input}
+                    placeholderTextColor="#888"
+                  />
+                  
+                  <TextInput
+                    placeholder="Correo electrónico"
+                    value={form.email}
+                    onChangeText={(text) => setForm({ ...form, email: text })}
+                    style={styles.input}
+                    placeholderTextColor="#888"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  
+                  <TextInput
+                    placeholder="Nueva contraseña (opcional)"
+                    value={form.password}
+                    onChangeText={(text) => setForm({ ...form, password: text })}
+                    style={styles.input}
+                    placeholderTextColor="#888"
+                    secureTextEntry
+                  />
+
+                  <TextInput
+                    placeholder="Rol"
+                    value={form.role}
+                    onChangeText={(text) => setForm({ ...form, role: text })}
+                    style={styles.input}
+                    placeholderTextColor="#888"
+                  />
+                  
+                  {/* Nuevos campos */}
+                  <TextInput
+                    placeholder="Ciudad"
+                    value={form.city}
+                    onChangeText={(text) => setForm({ ...form, city: text })}
+                    style={styles.input}
+                    placeholderTextColor="#888"
+                  />
+                  
+                  <TextInput
+                    placeholder="Código Postal"
+                    value={form.zip_code}
+                    onChangeText={(text) => setForm({ ...form, zip_code: text })}
+                    style={styles.input}
+                    placeholderTextColor="#888"
+                  />
+                  
+                  <TextInput
+                    placeholder="País"
+                    value={form.country}
+                    onChangeText={(text) => setForm({ ...form, country: text })}
+                    style={styles.input}
+                    placeholderTextColor="#888"
+                  />
+                  
+                  <TextInput
+                    placeholder="Número de teléfono"
+                    value={form.phone_number}
+                    onChangeText={(text) => setForm({ ...form, phone_number: text })}
+                    style={styles.input}
+                    placeholderTextColor="#888"
+                    keyboardType="phone-pad"
+                  />
+
+                  {/* Switch para perfil completado */}
+                  <View style={styles.switchContainer}>
+                    <Text style={styles.switchLabel}>Perfil Completado:</Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.switch,
+                        { backgroundColor: form.profile_completed ? '#4e8cff' : '#ccc' }
+                      ]}
+                      onPress={() => setForm({ ...form, profile_completed: !form.profile_completed })}
+                    >
+                      <View
+                        style={[
+                          styles.switchThumb,
+                          { transform: [{ translateX: form.profile_completed ? 20 : 2 }] }
+                        ]}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  
+                </ScrollView>
                 
                 <View style={styles.modalButtons}>
                   <Button title="Actualizar" onPress={updateUser} />
@@ -297,47 +443,38 @@ export default function UserManagement() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f5f5f5' },
-
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
   container: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#f5f5f5',
   },
   sidebar: {
-    height: SCREEN_HEIGHT,
     backgroundColor: '#11101d',
     paddingTop: 20,
   },
   logoDetails: {
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
+    paddingHorizontal: 15,
+    marginBottom: 30,
   },
   logoText: {
     color: '#fff',
-    fontSize: 22,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   navLinks: {
-    paddingLeft: 10,
+    flex: 1,
   },
   linkContainer: {
-    backgroundColor: '#1d1b31',
-    marginVertical: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
+    textDecorationLine: 'none',
   },
   navLinkText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
   },
   homeSection: {
     flex: 1,
@@ -345,64 +482,88 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: 24,
-    fontWeight: '500',
+    fontWeight: 'bold',
     color: '#11101d',
     marginBottom: 20,
   },
-
-  card: {
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
+  successMessageContainer: {
+    backgroundColor: '#d4edda',
+    borderColor: '#c3e6cb',
+    borderWidth: 1,
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
   },
-
+  successMessageText: {
+    color: '#155724',
+    textAlign: 'center',
+  },
+  card: {
+    flexDirection: 'row',
+    padding: 15,
+    marginBottom: 10,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: '#000000aa',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
-    backgroundColor: 'white',
-    borderRadius: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
     padding: 20,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
     marginBottom: 15,
     textAlign: 'center',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginBottom: 15,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
     fontSize: 16,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 10,
+    paddingVertical: 5,
+  },
+  switchLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  switch: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  switchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#fff',
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-  },
-
-  successMessageContainer: {
-    backgroundColor: '#4caf50',
-    paddingVertical: 10,
-    marginBottom: 15,
-    borderRadius: 10,
-  },
-  successMessageText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: '600',
+    marginTop: 20,
   },
 });
