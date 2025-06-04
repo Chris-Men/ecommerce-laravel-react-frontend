@@ -73,7 +73,7 @@ export default function HomeScreen() {
       {/* Main Content */}
       <View style={styles.homeSection}>
         <ThemedText style={styles.welcomeText}>¡Bienvenido {userName}!</ThemedText>
-        <View style={{ marginVertical: 20 }}>
+        <View style={{ marginVertical: 20, width: 200 }}>
           <Button title="Cerrar sesión" onPress={handleLogout} />
         </View>
       </View>
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   },
   homeSection: {
     flex: 1,
-    padding: 20,
+    padding: 30,
   },
   welcomeText: {
     fontSize: 24,
