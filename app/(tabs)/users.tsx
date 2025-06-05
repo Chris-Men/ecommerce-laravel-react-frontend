@@ -486,6 +486,7 @@ const styles = StyleSheet.create({
     color: '#11101d',
     marginBottom: 20,
   },
+<<<<<<< HEAD
   successMessageContainer: {
     backgroundColor: '#d4edda',
     borderColor: '#c3e6cb',
@@ -511,6 +512,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
+=======
+
+  card: {
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 8,
+    marginEnd: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+>>>>>>> ed4f53b753438e391ec9b4022e958eb7b350a3df
   },
   modalOverlay: {
     flex: 1,
