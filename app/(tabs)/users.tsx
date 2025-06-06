@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface User {
   id: number;
@@ -43,7 +43,7 @@ export default function UserManagement() {
   const isMobile = !isWeb;
 
   // En web sidebar un poco más angosto, en móvil el ancho fijo 180
-  const SIDEBAR_WIDTH = isWeb ? 140 : 180;
+  const SIDEBAR_WIDTH = isWeb ? 200 : 180;
 
   const [users, setUsers] = useState<User[]>([]);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -200,7 +200,7 @@ export default function UserManagement() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={[styles.container]}>
-        {/* Sidebar */}
+        {/* Sidebar with improved styling */}
         <View style={[styles.sidebar, { width: SIDEBAR_WIDTH }]}>
           <View style={styles.logoDetails}>
             <Text style={styles.logoText}>🛒 MyStore</Text>
@@ -239,11 +239,11 @@ export default function UserManagement() {
               keyExtractor={(item) => item.id.toString()}
               contentContainerStyle={{ paddingBottom: 20 }}
               renderItem={({ item }) => (
-                <View style={[styles.card, { backgroundColor: '#fff' }]}>
+                <View style={styles.card}>
                   <View style={{ flex: 1 }}>
                     <Text
                       style={[
-                        { fontSize: 16, fontWeight: '600', marginBottom: 4, color: '#11101d' },
+                        styles.cardTitle,
                         isMobile ? { marginLeft: 20 } : {},
                       ]}
                     >
@@ -251,7 +251,7 @@ export default function UserManagement() {
                     </Text>
                     <Text
                       style={[
-                        { fontSize: 14, color: '#666', marginBottom: 2 },
+                        styles.cardText,
                         isMobile ? { marginLeft: 20 } : {},
                       ]}
                     >
@@ -259,7 +259,7 @@ export default function UserManagement() {
                     </Text>
                     <Text
                       style={[
-                        { fontSize: 14, color: '#666', marginBottom: 2 },
+                        styles.cardText,
                         isMobile ? { marginLeft: 20 } : {},
                       ]}
                     >
@@ -280,17 +280,17 @@ export default function UserManagement() {
                     {item.city && (
                       <Text
                         style={[
-                          { fontSize: 14, color: '#666', marginBottom: 2 },
+                          styles.cardText,
                           isMobile ? { marginLeft: 20 } : {},
                         ]}
                       >
-                        🏙️ {item.city}, {item.country}
+                        🏙 {item.city}, {item.country}
                       </Text>
                     )}
                     {item.phone_number && (
                       <Text
                         style={[
-                          { fontSize: 14, color: '#666', marginBottom: 2 },
+                          styles.cardText,
                           isMobile ? { marginLeft: 20 } : {},
                         ]}
                       >
@@ -312,7 +312,7 @@ export default function UserManagement() {
                   </View>
                   <View style={{ justifyContent: 'center' }}>
                     <TouchableOpacity onPress={() => startEditing(item)}>
-                      <Text style={{ color: '#4e8cff', fontWeight: '500' }}>Editar</Text>
+                      <Text style={styles.editButton}>Editar</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -445,65 +445,92 @@ export default function UserManagement() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   container: {
     flex: 1,
     flexDirection: 'row',
+    backgroundColor: '#f8f9fa',
   },
+  // Improved Sidebar styling (copied from Categories)
   sidebar: {
+    height: SCREEN_HEIGHT,
     backgroundColor: '#11101d',
     paddingTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   logoDetails: {
-    paddingHorizontal: 15,
-    marginBottom: 30,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1d1b31',
   },
   logoText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '600',
   },
   navLinks: {
-    flex: 1,
+    paddingLeft: 10,
+    paddingRight: 10,
   },
   linkContainer: {
-    textDecorationLine: 'none',
+    backgroundColor: '#1d1b31',
+    marginVertical: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
   navLinkText: {
     color: '#fff',
-    fontSize: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
+    fontSize: 16,
+    fontWeight: '500',
   },
   homeSection: {
     flex: 1,
-    padding: 20,
+    padding: Platform.OS === 'web' ? 30 : 20,
+    backgroundColor: '#f8f9fa',
   },
   welcomeText: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#11101d',
-    marginBottom: 20,
+    color: '#2c3e50',
+    marginBottom: 25,
+    paddingBottom: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: '#e9ecef',
   },
-<<<<<<< HEAD
   successMessageContainer: {
     backgroundColor: '#d4edda',
     borderColor: '#c3e6cb',
     borderWidth: 1,
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
   },
   successMessageText: {
     color: '#155724',
+    fontSize: 16,
     textAlign: 'center',
+    fontWeight: '500',
   },
   card: {
     flexDirection: 'row',
     padding: 15,
     marginBottom: 10,
     borderRadius: 8,
+    backgroundColor: '#fff',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -512,21 +539,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
-=======
-
-  card: {
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 8,
-    marginEnd: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-    flexDirection: 'row',
     alignItems: 'center',
->>>>>>> ed4f53b753438e391ec9b4022e958eb7b350a3df
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    color: '#11101d',
+  },
+  cardText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 2,
+  },
+  editButton: {
+    color: '#4e8cff',
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,

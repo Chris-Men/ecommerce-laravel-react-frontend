@@ -26,7 +26,7 @@ const API_URL = 'http://localhost:8000/api';
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const isWeb = Platform.OS === 'web';
-const SIDEBAR_WIDTH = isWeb ? 140 : 180;
+const SIDEBAR_WIDTH = isWeb ? 200 : 180;
 const PRODUCTS_PER_PAGE = 12;
 
 // Calcular el número de columnas basado en el ancho de pantalla
@@ -998,17 +998,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   // Estilos del Sidebar
-  sidebar: {
+   sidebar: {
     height: SCREEN_HEIGHT,
     backgroundColor: '#11101d',
     paddingTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
+
   logoDetails: {
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
+  height: 60,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 10,
+  borderBottomWidth: 1,
+  borderBottomColor: '#1d1b31',
+},
+
+
   logoText: {
     color: '#fff',
     fontSize: 22,
@@ -1016,7 +1026,10 @@ const styles = StyleSheet.create({
   },
   navLinks: {
     paddingLeft: 10,
+    paddingRight: 10,
   },
+
+
    modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -1074,19 +1087,22 @@ const styles = StyleSheet.create({
   },
   linkContainer: {
     backgroundColor: '#1d1b31',
-    marginVertical: 8,
-    paddingVertical: 10,
+    marginVertical: 4,
+    paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 20,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
-    elevation: 5,
+    elevation: 3,
   },
-  navLinkText: {
+
+
+   navLinkText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: '500',
   },
 
   // Estilos para búsqueda

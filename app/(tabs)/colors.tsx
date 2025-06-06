@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type Color = {
   id: number;
@@ -34,7 +34,7 @@ export default function ColorsPage() {
   const isMobile = !isWeb;
 
   // En web sidebar un poco más angosto, en móvil el ancho fijo 180
-  const SIDEBAR_WIDTH = isWeb ? 140 : 180;
+  const SIDEBAR_WIDTH = isWeb ? 200 : 180;
 
   const [colors, setColors] = useState<Color[]>([]);
   const [name, setName] = useState('');
@@ -161,7 +161,7 @@ export default function ColorsPage() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={[styles.container]}>
-        {/* Sidebar */}
+        {/* Sidebar with improved styling */}
         <View style={[styles.sidebar, { width: SIDEBAR_WIDTH }]}>
           <View style={styles.logoDetails}>
             <Text style={styles.logoText}>🛒 MyStore</Text>
@@ -308,23 +308,33 @@ export default function ColorsPage() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f5f5f5' },
-
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
   container: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
+  // Improved Sidebar styling (copied from Users)
   sidebar: {
     height: SCREEN_HEIGHT,
     backgroundColor: '#11101d',
     paddingTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   logoDetails: {
     height: 60,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1d1b31',
   },
   logoText: {
     color: '#fff',
@@ -333,41 +343,47 @@ const styles = StyleSheet.create({
   },
   navLinks: {
     paddingLeft: 10,
+    paddingRight: 10,
   },
   linkContainer: {
     backgroundColor: '#1d1b31',
-    marginVertical: 8,
-    paddingVertical: 10,
+    marginVertical: 4,
+    paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 20,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
-    elevation: 5,
+    elevation: 3,
   },
   navLinkText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: '500',
   },
   homeSection: {
     flex: 1,
-    padding: 20,
+    padding: Platform.OS === 'web' ? 30 : 20,
+    backgroundColor: '#f8f9fa',
   },
   welcomeText: {
-    fontSize: 24,
-    fontWeight: '500',
-    color: '#11101d',
-    marginBottom: 20,
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 25,
+    paddingBottom: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: '#e9ecef',
   },
 
   card: {
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 8,
     marginVertical: 8,
     marginEnd: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
@@ -375,7 +391,7 @@ const styles = StyleSheet.create({
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: '#000000aa',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -405,14 +421,17 @@ const styles = StyleSheet.create({
   },
 
   successMessageContainer: {
-    backgroundColor: '#4caf50',
-    paddingVertical: 10,
-    marginBottom: 15,
-    borderRadius: 10,
+    backgroundColor: '#d4edda',
+    borderColor: '#c3e6cb',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
   },
   successMessageText: {
-    color: 'white',
+    color: '#155724',
+    fontSize: 16,
     textAlign: 'center',
-    fontWeight: '600',
+    fontWeight: '500',
   },
 });
